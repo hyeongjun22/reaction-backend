@@ -7,6 +7,27 @@
 
 ---
 
+## v2.35 — 2026-10-19 (인터뷰 답 제출: 재전송 409 · 카탈로그 밖 slotKey 422 · 재개 톤)
+
+**에러 응답 추가 — `POST /interview/sessions/{id}/answers`.** 성공 응답 스키마 무변경, 마이그레이션 없음.
+
+- 새 에러 코드 `INTERVIEW_STALE_TURN`(409): `clientTurn` 이 세션의 현재 `totalTurns` 와 다르면
+  거절한다. 이미 처리된 답의 재전송(네트워크 재시도·다른 기기·두 탭)이 같은 답을 두 번 채점하고
+  질문을 두 번 만들던(LLM 2배) 것을 막는다. 거절할 때는 LLM 을 부르지 않고 턴도 진행하지 않는다.
+  이미 종료된 세션은 종전처럼 종료 응답을 준다(이 검사보다 먼저 본다).
+- 세션 kind 의 슬롯 카탈로그에 없는 `slotKey` 는 422 `COMMON_VALIDATION_ERROR`(`field: "slotKey"`).
+  예전엔 그 키 그대로 슬롯 답 행이 생겼다.
+- `POST .../next-question`(재개) 질문도 시작·답 제출과 같은 사용자 톤(`toneMode`)으로 만든다 —
+  예전엔 재개 질문만 톤 없이 나갔다. 응답 형태 무변경.
+
+### FE 가 할 일
+
+- 지금처럼 `clientTurn: session.totalTurns`(직전 응답 값)를 보내면 된다 — 정상 흐름은 영향 없다.
+- (권장) 409 `INTERVIEW_STALE_TURN` 을 받으면 오류 문구 대신 `next-question` 으로 현재 질문을
+  다시 받아 이어 간다 — 다른 탭·기기에서 이미 진행된 상태다.
+
+---
+
 ## v2.34 — 2026-09-28 (주간 캘린더에 Google 캘린더 약속이 보인다)
 
 **additive — `GET /plans/weekly`.** 기존 필드·에러 코드 무변경, 마이그레이션 없음, Google 호출 수 무변경.

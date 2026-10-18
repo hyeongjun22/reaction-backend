@@ -38,8 +38,8 @@ from reaction_backend.schemas.ultimate_goal import UltimateGoalOutcome
 
 __all__ = [
     "TurnResult",
-    "finalize_if_complete",
     "finish_early",
+    "resume",
     "start_interview",
     "submit_and_advance",
 ]
@@ -183,22 +183,28 @@ async def submit_and_advance(
     return TurnResult(state=state, done=False, question=state["next_question"], harvested=harvested)
 
 
-async def finalize_if_complete(
+async def resume(
     *,
     state: InterviewState,
     session: AsyncSession | None = None,
     tone_mode: str | None = None,
-) -> TurnResult | None:
-    """필수 슬롯이 **이미** 다 찼으면 질문 대신 마감 결과를, 아니면 `None` 을 돌려준다.
+    slot_meta: dict[str, dict[str, Any]] | None = None,
+) -> TurnResult:
+    """중단된 세션 재개(`next-question`) — 지금 미해결 슬롯의 질문을 다시 만든다.
 
-    답 제출(`submit_and_advance`) 밖에서 슬롯이 채워지는 경로가 있다 — 자료 확정
-    (`POST /plans/materials/spec-confirm`)이 `goals.materials` 를 직접 쓴다. 재인터뷰에서
-    그게 마지막 빈 슬롯이면, 재개(`next-question`)가 물을 슬롯 없이 빈 질문만 돌려줘
-    인터뷰가 영영 끝나지 않았다. 재개 경로가 이 함수로 먼저 마감 여부를 본다.
+    필수 슬롯이 **이미** 다 찼으면 질문 대신 마감한다. 답 제출(`submit_and_advance`) 밖에서
+    슬롯이 채워지는 경로가 있다 — 자료 확정(`POST /plans/materials/spec-confirm`)이
+    `goals.materials` 를 직접 쓴다. 재인터뷰에서 그게 마지막 빈 슬롯이면, 재개가 물을 슬롯
+    없이 빈 질문만 돌려줘 인터뷰가 영영 끝나지 않았다.
+
+    시작·답 제출과 **같은 config**(톤 포함)로 노드를 부른다 — 라우트가 노드를 직접 부르던
+    시절 재개 질문만 tone_mode 없이 만들어졌다.
     """
-    if interview.should_continue(state) != "finish":
-        return None
-    return await _finalize(state, _config(session, tone_mode))
+    config = _config(session, tone_mode, slot_meta=slot_meta)
+    if interview.should_continue(state) == "finish":
+        return await _finalize(state, config)
+    state = await interview.ask_question(state, config)
+    return TurnResult(state=state, done=False, question=state["next_question"])
 
 
 async def finish_early(

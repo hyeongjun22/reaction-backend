@@ -10,6 +10,7 @@ import asyncio
 from typing import Any
 from uuid import UUID, uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from reaction_backend.llm import RunResult, aiClient
@@ -354,9 +355,10 @@ def test_critical_slot_reask_persists_attempts_across_db(
     sid = client.post("/interview/sessions").json()["sessionId"]
 
     def answer(slot: str, val: Any) -> dict[str, Any]:
+        turn = client.get(f"/interview/sessions/{sid}").json()["totalTurns"]
         return client.post(
             f"/interview/sessions/{sid}/answers",
-            json={"slotKey": slot, "value": val, "clientTurn": 1},
+            json={"slotKey": slot, "value": val, "clientTurn": turn},
         ).json()
 
     # 프로필 chip 슬롯(정체성 2 + 전역 집중 시간대)을 유효하게 채워 goals.list 에 도달
@@ -1013,3 +1015,136 @@ def test_single_choice_question_is_not_multiple(client: TestClient, monkeypatch:
     question = client.post("/interview/sessions").json()["currentQuestion"]
     assert question["slotKey"] == "identity.role"
     assert question["multiple"] is False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 재개 톤 · clientTurn 중복 제출 · 카탈로그 밖 slotKey
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _recording_stub(calls: list[dict[str, Any]]) -> Any:
+    """`_stub()` 그대로 동작하면서 aiClient.run 호출 인자를 기록한다."""
+    inner = _stub()
+
+    async def stub_run(**kwargs: Any) -> RunResult[Any]:
+        calls.append(kwargs)
+        return await inner(**kwargs)
+
+    return stub_run
+
+
+def test_resume_question_uses_the_users_tone(client: TestClient, monkeypatch: Any) -> None:
+    """재개(next-question)로 만든 질문도 시작·답 제출과 같은 사용자 톤으로 만든다.
+
+    회귀: 라우트가 노드를 직접 부르며 config 에 tone_mode 를 안 실어, 재개 질문만 톤 없이 나갔다.
+    """
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(aiClient, "run", _recording_stub(calls))
+    sid = client.post("/interview/sessions").json()["sessionId"]
+    calls.clear()
+
+    res = client.post(f"/interview/sessions/{sid}/next-question")
+
+    assert res.status_code == 200
+    asked = [c for c in calls if c["schema"] is NextQuestionSchema]
+    assert [c["tone_mode"] for c in asked] == ["gentle"]  # conftest 데모 사용자의 톤
+
+
+def test_resubmitted_answer_with_a_stale_client_turn_is_rejected(
+    client: TestClient, fake_interview_repo: FakeInterviewRepo, monkeypatch: Any
+) -> None:
+    """이미 처리된 턴의 답(같은 clientTurn 재전송)은 409 — 다시 채점·질문 생성하지 않는다.
+
+    `clientTurn` 은 클라이언트가 직전 응답의 `totalTurns` 를 그대로 보내는 값이다
+    (FE GoalIntakeScreen·UltimateGoalInterviewScreen). 맞지 않으면 그 사이 다른 요청이 턴을
+    진행시킨 것이라, 처리하면 같은 답이 두 번 채점되고 LLM 호출이 두 배가 된다.
+    """
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(aiClient, "run", _recording_stub(calls))
+    start = client.post("/interview/sessions").json()
+    sid = start["sessionId"]
+    body = {"slotKey": "identity.role", "value": ["3학년"], "clientTurn": start["totalTurns"]}
+    first = client.post(f"/interview/sessions/{sid}/answers", json=body)
+    assert first.status_code == 200
+    calls.clear()
+
+    again = client.post(f"/interview/sessions/{sid}/answers", json=body)
+
+    assert again.status_code == 409
+    assert again.json()["code"] == "INTERVIEW_STALE_TURN"
+    assert calls == []  # 채점·질문 생성 LLM 을 부르지 않았다
+    row = fake_interview_repo._sessions[UUID(sid)]
+    assert row.total_turns == first.json()["totalTurns"]  # 턴이 더 진행되지 않았다
+
+
+def test_answer_with_a_client_turn_ahead_of_the_session_is_rejected(
+    client: TestClient, monkeypatch: Any
+) -> None:
+    """서버보다 **앞선** clientTurn 도 거절한다 — 같은지 보는 검사지, 뒤처졌는지만 보는 게 아니다."""
+    monkeypatch.setattr(aiClient, "run", _stub())
+    start = client.post("/interview/sessions").json()
+
+    res = client.post(
+        f"/interview/sessions/{start['sessionId']}/answers",
+        json={
+            "slotKey": "identity.role",
+            "value": ["3학년"],
+            "clientTurn": start["totalTurns"] + 1,
+        },
+    )
+
+    assert res.status_code == 409
+    assert res.json()["code"] == "INTERVIEW_STALE_TURN"
+
+
+def test_answer_with_the_current_client_turn_is_accepted(
+    client: TestClient, monkeypatch: Any
+) -> None:
+    """직전 응답의 totalTurns 를 보내면 받는다 — 위 검사가 정상 흐름을 막지 않는다."""
+    monkeypatch.setattr(aiClient, "run", _stub())
+    start = client.post("/interview/sessions").json()
+    sid = start["sessionId"]
+    first = client.post(
+        f"/interview/sessions/{sid}/answers",
+        json={"slotKey": "identity.role", "value": ["3학년"], "clientTurn": start["totalTurns"]},
+    ).json()
+
+    second = client.post(
+        f"/interview/sessions/{sid}/answers",
+        json={"slotKey": "identity.season", "value": ["방학"], "clientTurn": first["totalTurns"]},
+    )
+
+    assert second.status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("kind", "slot_key"),
+    [
+        ("plan", "identity.nickname"),  # 어느 카탈로그에도 없는 키
+        ("ultimate", "identity.role"),  # 계획 인터뷰 키 — 궁극목표 세션의 카탈로그 밖
+    ],
+)
+def test_answer_for_a_slot_outside_the_session_catalog_is_rejected(
+    client: TestClient,
+    fake_interview_repo: FakeInterviewRepo,
+    monkeypatch: Any,
+    kind: str,
+    slot_key: str,
+) -> None:
+    """세션 kind 의 카탈로그에 없는 slotKey 는 422 — 그 키로 슬롯 답을 저장하지 않는다."""
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(aiClient, "run", _recording_stub(calls))
+    start = client.post("/interview/sessions", json={"kind": kind}).json()
+    sid = start["sessionId"]
+    calls.clear()
+
+    res = client.post(
+        f"/interview/sessions/{sid}/answers",
+        json={"slotKey": slot_key, "value": "아무 값", "clientTurn": start["totalTurns"]},
+    )
+
+    assert res.status_code == 422
+    assert res.json()["code"] == "COMMON_VALIDATION_ERROR"
+    assert res.json()["field"] == "slotKey"
+    assert slot_key not in fake_interview_repo._answers.get(UUID(sid), {})
+    assert calls == []

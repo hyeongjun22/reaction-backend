@@ -33,9 +33,11 @@ _ULTIMATE_ANSWERS: list[tuple[str, Any]] = [
 
 
 def _answer(client: TestClient, sid: str, slot_key: str, value: Any) -> dict[str, Any]:
+    # FE 처럼 직전 상태의 totalTurns 를 clientTurn 으로 보낸다(다르면 409 INTERVIEW_STALE_TURN).
+    turn = client.get(f"/interview/sessions/{sid}").json()["totalTurns"]
     res = client.post(
         f"/interview/sessions/{sid}/answers",
-        json={"slotKey": slot_key, "value": value, "clientTurn": 1},
+        json={"slotKey": slot_key, "value": value, "clientTurn": turn},
     )
     assert res.status_code == 200, res.text
     return res.json()

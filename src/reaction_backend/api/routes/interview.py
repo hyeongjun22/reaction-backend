@@ -35,7 +35,6 @@ from typing import Annotated, Any, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
-from langchain_core.runnables import RunnableConfig
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from reaction_backend.api.deps import CurrentUser
@@ -164,13 +163,6 @@ def _parse_session_id(session_id: str) -> UUID:
         return UUID(session_id)
     except ValueError as e:
         raise _not_found() from e
-
-
-def _config(
-    session: AsyncSession, slot_meta: dict[str, dict[str, Any]] | None = None
-) -> RunnableConfig:
-    """노드가 예산 가드·llm_runs 기록에 쓰는 세션 채널 (ADR-0005 §7.1) + 슬롯 메타."""
-    return {"configurable": {"session": session, "slot_meta": slot_meta or {}}}
 
 
 def _slot_meta(
@@ -702,10 +694,28 @@ async def submit_answer(
         row = await _load(repo, user.id, session_id)
         if row.end_reason is not None:
             return _ended_response(row, await repo.list_slot_answers(row.id))
+        answered_slot = CATALOGS[row.kind].by_key.get(body.slot_key)
+        if answered_slot is None:
+            # 그 kind 의 카탈로그에 없는 키 — 받으면 그 키 그대로 슬롯 답 행이 생긴다.
+            raise ApiError(
+                ErrorCode.COMMON_VALIDATION_ERROR,
+                "이 인터뷰에 없는 질문이에요.",
+                http_status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                field="slotKey",
+            )
+        if body.client_turn != row.total_turns:
+            # 클라이언트는 직전 응답의 `totalTurns` 를 `clientTurn` 으로 보낸다. 다르면 그 사이
+            # 다른 요청(재전송·다른 기기)이 턴을 진행시킨 것이다 — 처리하면 같은 답을 두 번
+            # 채점하고 질문을 두 번 만든다(LLM 2배). lock 은 동시 실행만 막지 중복은 못 막는다.
+            raise ApiError(
+                ErrorCode.INTERVIEW_STALE_TURN,
+                "이미 처리된 답이에요. 인터뷰를 다시 불러와 이어서 진행해 주세요.",
+                http_status=status.HTTP_409_CONFLICT,
+                field="clientTurn",
+            )
 
         slot_rows = await repo.list_slot_answers(row.id)
         state = _state_from_db(row, slot_rows)
-        answered_slot = CATALOGS[row.kind].by_key.get(body.slot_key)
         answer_titles = await _mandala_goal_titles_if_needed(
             session, user.id, body.slot_key, kind=row.kind
         )
@@ -715,7 +725,7 @@ async def submit_answer(
             answer_value=body.value,
             session=session,
             tone_mode=user.tone_mode,
-            answer_type=answered_slot.answer_type if answered_slot else None,
+            answer_type=answered_slot.answer_type,
             options=_question_options(
                 body.slot_key,
                 state["slot_answers"],
@@ -761,30 +771,29 @@ async def next_question(
         slot_rows = await repo.list_slot_answers(row.id)
         state = _state_from_db(row, slot_rows)
         # 답 제출 밖에서 마지막 빈 슬롯이 채워졌으면(자료 확정 spec-confirm 이 goals.materials
-        # 를 직접 쓴다) 물을 슬롯이 없다. 빈 질문을 돌려주면 FE 는 "다음 질문을 받지 못했어요"
-        # 만 되풀이하고 인터뷰가 영영 끝나지 않았다 — 답 제출과 같은 마감 경로로 끝낸다.
-        done = await interview_runner.finalize_if_complete(
-            state=state, session=session, tone_mode=user.tone_mode
+        # 를 직접 쓴다) 물을 슬롯이 없다 — `resume` 이 질문 대신 마감하고, 답 제출과 같은
+        # 마감 경로로 끝낸다.
+        result = await interview_runner.resume(
+            state=state,
+            session=session,
+            tone_mode=user.tone_mode,
+            slot_meta=_slot_meta(state["slot_answers"], kind=row.kind),
         )
-        if done is not None:
-            await _persist_turn(repo, row, done.state)
+        await _persist_turn(repo, row, result.state)
+        if result.done:
             return await _finalize_and_respond(
                 session=session,
                 repo=repo,
                 row=row,
                 user=user,
-                result=done,
+                result=result,
                 default_reason="completed",
             )
-        state = await interview.ask_question(
-            state, _config(session, _slot_meta(state["slot_answers"], kind=row.kind))
-        )
-        await _persist_turn(repo, row, state)
         await session.commit()
         titles = await _mandala_goal_titles_if_needed(
-            session, user.id, state.get("next_slot_key"), kind=row.kind
+            session, user.id, result.state.get("next_slot_key"), kind=row.kind
         )
-        return _response(row.id, state, kind=row.kind, mandala_goal_titles=titles)
+        return _response(row.id, result.state, kind=row.kind, mandala_goal_titles=titles)
 
 
 @router.post("/sessions/{session_id}/finish")
