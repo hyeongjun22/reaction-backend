@@ -584,16 +584,22 @@ async def validate_answer(state: InterviewState, config: RunnableConfig) -> Inte
     # 안전망이기도 하다 — FE 는 칩을 탭해도 **문자열**("3학년")로 보내므로, 이 길이 없으면
     # 폴백 한 번에 칩 답이 전부 '없음'(스킵)으로 저장되고 — 이월 슬롯이라 — 다음 인터뷰에서도
     # 다시 묻지 않았다.
-    rule_chips = _rule_chip_values(
-        answer_type, answer_text, slot=slot, options=_answer_options(config)
+    options = _answer_options(config)
+    rule_chips = _rule_chip_values(answer_type, answer_text, slot=slot, options=options)
+    # 칩/선택 슬롯에서 LLM 값이 보기로 안 맞춰지면 LLM 이 판단하지 못한 것으로 본다 — 그러면
+    # 사용자가 보기를 그대로 보낸 경우(칩 탭) 룰이 맞춘 보기가 이긴다.
+    llm_value = (
+        update.normalized_value
+        if _fits_options(answer_type, update.normalized_value, slot=slot, options=options)
+        else None
     )
     if ruled is not None:
         normalized = ruled
     elif _chip_rule_decides(slot, answer_type, state["last_answer"]):
         # 길이 슬롯에 **직접 입력**이 온 경우 — 값을 정하는 건 룰이다(`_chip_rule_decides`).
         normalized = rule_chips
-    elif update.normalized_value is not None:
-        normalized = update.normalized_value
+    elif llm_value is not None:
+        normalized = llm_value
     else:
         normalized = rule_chips
 
@@ -612,12 +618,16 @@ async def validate_answer(state: InterviewState, config: RunnableConfig) -> Inte
         # 카탈로그에 고정 보기가 있는 칩/선택 슬롯만 — `goals.heaviest` 처럼 보기를 런타임에
         # 만드는 슬롯은 핵심 슬롯 경로가 이미 같은 재질문을 한다.
         has_chip_options=bool(slot and slot.options) and answer_type in {"chip", "select"},
+        slot=slot,
+        options=options,
     )
     if stored is not None:  # 실제 값·스킵·pending 모두 저장(영속) — pending 은 '미충족'으로 읽힘
         slot_answers[slot_key] = stored
     # 목표가 1개뿐이면 goals.heaviest 자동 채움 → 자명한 select 질문(직전 답 echo)을 건너뛴다.
     if filled_now and slot_key == "goals.list":
         _autofill_single_goal_heaviest(slot_answers)
+    if slot_key == "goals.heaviest":
+        _settle_unpicked_heaviest(slot_answers)
 
     # 같은 호출에서 함께 뽑힌 다른 슬롯들 — 게이트·정규화·과거마감 규칙은 그대로다.
     harvested = (
@@ -973,16 +983,56 @@ def _chip_rule_decides(
     )
 
 
+def _match_options(
+    values: Sequence[Any], *, slot: InterviewSlot | None, options: Sequence[str]
+) -> list[str]:
+    """칩 값들을 **실제로 보여 준 보기**로 맞춘다. 못 맞춘 값은 버린다.
+
+    - 카탈로그 보기가 있는 슬롯 → `canonical_chip_values`(정확·공백 무시·같은 시간 길이).
+    - 보기를 런타임에 만드는 슬롯(`goals.heaviest` — 사용자가 적은 목표 제목) → 라우터가 넘긴
+      `options` 와 공백만 무시하고 대조한다. 비슷한 값("토익" ↔ "토익 900점")을 받아 주면
+      `interview_adapter._build_goals` 가 목록에 없는 heaviest 를 새 목표로 덧붙인다.
+    - 대조할 보기가 아예 없으면(배치 그래프·옛 호출부) 다듬기만 한다 — 종전 동작.
+    """
+    if slot is not None and slot.options:
+        return canonical_chip_values(slot, values, drop_unknown=True)
+    if options:
+        by_squashed = {"".join(o.split()): o for o in options}
+        picked = (by_squashed.get("".join(str(v).split())) for v in values)
+        return list(dict.fromkeys(p for p in picked if p))
+    return canonical_chip_values(None, values, drop_unknown=True)
+
+
+def _fits_options(
+    answer_type: str | None, value: Any, *, slot: InterviewSlot | None, options: Sequence[str]
+) -> bool:
+    """칩/선택 슬롯의 LLM 정규화 값이 보기로 맞춰지는가.
+
+    칩/선택이 아니거나, 값이 없거나, '없음' 신호(빈 문자열)면 보기 검증 대상이 아니라 True.
+    """
+    if answer_type not in {"chip", "select"} or value is None:
+        return True
+    if isinstance(value, str) and not value.strip():
+        return True
+    return _coerce_normalized(answer_type, value, slot=slot, options=options) is not None
+
+
 def _coerce_normalized(
-    answer_type: str | None, norm: Any, *, slot: InterviewSlot | None = None
+    answer_type: str | None,
+    norm: Any,
+    *,
+    slot: InterviewSlot | None = None,
+    options: Sequence[str] = (),
 ) -> dict[str, Any] | None:
     """LLM 이 뽑은 normalized_value 를 슬롯 형식대로 저장 형태(dict)로 환원. 불가면 None.
 
-    ⚠️ **칩은 슬롯 옵션으로 검증한다** — 옵션에 없는 값은 버려 `None` 을 돌려준다(그러면
-    슬롯이 열린 채 남아 인터뷰가 실제 보기를 들고 정식으로 묻는다). 예전에는 LLM 이 낸
-    문자열을 `str()` 해서 그대로 담았고, 그 구멍으로 파서 사고가 두 번 났다 — `"2시간 이상"`
+    ⚠️ **칩은 보기로 검증한다**(`_match_options`) — 보기에 없는 값은 버려 `None` 을 돌려준다
+    (그러면 슬롯이 열린 채 남아 인터뷰가 실제 보기를 들고 정식으로 묻는다). 예전에는 LLM 이
+    낸 문자열을 `str()` 해서 그대로 담았고, 그 구멍으로 파서 사고가 두 번 났다 — `"2시간 이상"`
     을 2분으로(v2.00), `"30분"` 을 주당 30시간으로(v2.01) 읽은 것이다. 파서를 하나씩 고치는
-    대신 어휘를 좁힌다(`interview_catalog.canonical_chip`).
+    대신 어휘를 좁힌다(`interview_catalog.canonical_chip`). 수확 경로뿐 아니라 **답한 슬롯
+    자신의 값**도 이 검증을 지나야 한다 — 슬롯 없이 부르면 "주 1~2회" 가 그대로 저장돼
+    `_chip_frequency` 가 주 12회로 읽었다.
 
     build_outcome 이 읽는 규약과 일치:
     - chip/select → {"type":"chip","values":[...]}
@@ -994,7 +1044,7 @@ def _coerce_normalized(
         return None
     if answer_type in {"chip", "select"}:
         vals = norm if isinstance(norm, list) else [norm]
-        cleaned = canonical_chip_values(slot, vals, drop_unknown=True)
+        cleaned = _match_options(vals, slot=slot, options=options)
         return {"type": "chip", "values": cleaned} if cleaned else None
     if answer_type == "time_range":
         if isinstance(norm, dict):
@@ -1064,6 +1114,9 @@ def _resolve_stored_value(
     answer_type: str | None,
     last_answer: dict[str, Any] | None,
     normalized: Any,
+    *,
+    slot: InterviewSlot | None = None,
+    options: Sequence[str] = (),
 ) -> tuple[dict[str, Any] | None, bool]:
     """저장할 값과 is_constrained 를 결정.
 
@@ -1078,7 +1131,7 @@ def _resolve_stored_value(
     raw_structured = raw_type in {"chip", "range"}
     is_constrained = answer_type in _CONSTRAINED_TYPES or raw_structured
 
-    norm = _coerce_normalized(answer_type, normalized)
+    norm = _coerce_normalized(answer_type, normalized, slot=slot, options=options)
     if norm is not None:
         stored = norm
     elif (raw_structured or not is_constrained) and last_answer is not None:
@@ -1127,6 +1180,8 @@ def _decide_storage(
     critical_slots: frozenset[str] = PLAN_CATALOG.critical_slots,
     deadline_slot: str | None = PLAN_CATALOG.deadline_slot,
     has_chip_options: bool = False,
+    slot: InterviewSlot | None = None,
+    options: Sequence[str] = (),
 ) -> tuple[dict[str, Any] | None, bool]:
     """직전 답을 어떻게 저장할지 결정하는 **순수 함수** — `(stored, filled_now)`.
 
@@ -1146,6 +1201,7 @@ def _decide_storage(
     `today` (KST) 는 지난 마감 판정용. 넘기지 않으면 그 판정만 꺼진다(기존 동작 그대로).
     `critical_slots`/`deadline_slot` 은 카탈로그(kind) 별로 다르다 — 기본값은 plan 카탈로그
     (하위호환, 기존 호출부·단위 테스트 전부 무변경으로 안전).
+    `slot`/`options` 는 칩 값을 대조할 보기(카탈로그 보기 / 런타임 보기) — `_match_options`.
     """
     if last_answer is None:
         return None, False  # 배치 그래프 등 답 미주입 턴
@@ -1169,7 +1225,7 @@ def _decide_storage(
         }
     else:
         real_value, is_constrained = _resolve_stored_value(
-            slot_key, answer_type, last_answer, normalized
+            slot_key, answer_type, last_answer, normalized, slot=slot, options=options
         )
     has_real = real_value is not None and (is_constrained or clarity >= STORE_CLARITY_MIN)
 
@@ -1199,8 +1255,13 @@ def _decide_storage(
         # 답한 학생에게 '음 잘 모르겠어요' 라는 Focus 목표가 생기고, 그 이름으로 목표별
         # 질문과 계획까지 만들어졌다(미러 실측). 스킵 마커로 두면 `unresolved_slots` 에 남아
         # outcome 은 자리표시자 목표를 쓰고, 그 자리표시자는 영속되지 않는다(#88).
+        #
+        # 보기 중에서 골라야 하는 핵심 슬롯(`goals.heaviest`)은 자유 입력을 채택하지 않는다 —
+        # 보기에 없는 이름이 목표로 덧붙는다(`_build_goals`). 스킵으로 닫고, 호출부가
+        # `_settle_unpicked_heaviest` 로 첫 목표를 정한다.
         if attempts >= MAX_SLOT_ATTEMPTS:
-            if answer_text.strip() and not _looks_like_skip(answer_text):
+            picks_from_options = answer_type in {"chip", "select"} and bool(options)
+            if answer_text.strip() and not _looks_like_skip(answer_text) and not picks_from_options:
                 return {"type": "text", "raw": answer_text.strip()}, True
             return _SKIP_MARKER, True
         return _pending(attempts), False
@@ -1394,6 +1455,21 @@ def _per_goal_harvest_allowed(slot_answers: dict[str, dict[str, Any] | None]) ->
     if _is_filled(slot_answers.get("goals.heaviest")):
         return True
     return len(_slot_items(slot_answers.get("goals.list"))) == 1
+
+
+def _settle_unpicked_heaviest(slot_answers: dict[str, dict[str, Any] | None]) -> None:
+    """heaviest 가 고르지 못한 채(스킵) 닫혔으면 **첫 목표**로 정한다.
+
+    계획 쪽 규칙과 같은 대상이다 — `first_plan_adapter` 는 is_heaviest 가 없으면 첫 목표를
+    다룬다. 그런데 heaviest 를 비워 두면 `_build_goals` 가 목표별 답(마감·세션 길이·빈도…)을
+    어느 목표에도 붙이지 않아, 계획은 첫 목표를 다루면서 그 답들을 잃는다. 확인 카드가 이
+    목표를 보여 주므로 사용자는 계획 전에 볼 수 있다. 목표가 없으면 그대로 둔다.
+    """
+    if slot_answers.get("goals.heaviest") != _SKIP_MARKER:
+        return
+    items = _slot_items(slot_answers.get("goals.list"))
+    if items:
+        slot_answers["goals.heaviest"] = {"type": "chip", "values": [items[0]]}
 
 
 def _autofill_single_goal_heaviest(slot_answers: dict[str, dict[str, Any] | None]) -> None:

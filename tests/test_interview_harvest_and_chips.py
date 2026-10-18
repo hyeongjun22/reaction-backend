@@ -392,3 +392,203 @@ def test_catalog_duration_slots_are_exactly_the_length_valued_ones() -> None:
         "energy.focus_duration",
         "recovery.downscope_unit",
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P4 — 채점 LLM 의 정규화 값도 보기로 검증한다 (본 답 경로)
+#
+# 수확 경로는 `_coerce_normalized(slot=…)` 로 보기 밖 값을 버리는데, 답한 슬롯 자신의
+# 정규화 값은 슬롯 없이 불려 LLM 이 낸 문자열이 그대로 저장됐다. "주 1~2회" 가 저장되면
+# `_chip_frequency` 가 숫자를 이어 붙여 주 12회로 읽고, 한 번 2시간이면 계획이 주 24시간이 된다.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+async def test_llm_chip_value_outside_the_options_is_not_stored(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """보기에 없는 값("주 1~2회")은 저장하지 않고 보기를 들고 다시 묻는다."""
+    monkeypatch.setattr(aiClient, "run", _stub(normalized="주 1~2회"))
+    state = _state_missing("goals.frequency")
+
+    result = await _answer(state, "goals.frequency", "일주일에 한두 번요")
+
+    stored = result.state["slot_answers"].get("goals.frequency")
+    assert stored == interview._pending(1, interview._RETRY_OFF_CATALOG)
+    assert result.state["next_slot_key"] == "goals.frequency"
+
+
+async def test_llm_chip_value_in_another_spelling_is_stored_as_the_option(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """띄어쓰기만 다른 값("주3회")은 보기 표기("주 3회")로 저장한다 — 다시 묻지 않는다."""
+    monkeypatch.setattr(aiClient, "run", _stub(normalized="주3회"))
+    state = _state_missing("goals.frequency")
+
+    result = await _answer(state, "goals.frequency", "일주일에 세 번이요")
+
+    assert result.state["slot_answers"]["goals.frequency"] == {
+        "type": "chip",
+        "values": ["주 3회"],
+    }
+    assert result.state["next_slot_key"] != "goals.frequency"
+
+
+async def test_tapped_option_survives_an_off_catalog_llm_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """보기를 그대로 보냈으면(FE 칩 탭) LLM 이 보기 밖 값을 내도 탭한 보기가 저장된다."""
+    monkeypatch.setattr(aiClient, "run", _stub(normalized="주 3번"))
+    state = _state_missing("goals.frequency")
+
+    result = await _answer(state, "goals.frequency", "주 3회")
+
+    assert result.state["slot_answers"]["goals.frequency"] == {
+        "type": "chip",
+        "values": ["주 3회"],
+    }
+
+
+async def test_llm_skip_signal_still_closes_an_optioned_chip_slot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """LLM 의 '없음' 신호(빈 문자열)는 보기 검증에 걸려 사라지지 않는다 — 그대로 스킵한다."""
+    monkeypatch.setattr(aiClient, "run", _stub(normalized=""))
+    # 길이 슬롯이 아닌 칩이어야 한다 — 길이 슬롯은 직접 입력을 룰이 정한다(`_chip_rule_decides`).
+    state = _state_missing("recovery.tone")
+
+    result = await _answer(state, "recovery.tone", "그건 패스할게요")
+
+    assert result.state["slot_answers"]["recovery.tone"] == interview._SKIP_MARKER
+
+
+@pytest.mark.parametrize(
+    ("llm_value", "expected"),
+    [
+        ("주 1~2회", (interview._pending(1, interview._RETRY_OFF_CATALOG), False)),
+        ("주3회", ({"type": "chip", "values": ["주 3회"]}, True)),
+        (["주 3회", "주 9회"], ({"type": "chip", "values": ["주 3회"]}, True)),
+    ],
+)
+def test_decide_storage_checks_llm_chip_values_against_the_slot_options(
+    llm_value: Any, expected: tuple[dict[str, Any] | None, bool]
+) -> None:
+    """저장 경계에서 보기로 맞춘다 — 수확 경로(`_apply_harvested`)와 같은 규칙."""
+    assert (
+        interview._decide_storage(
+            "goals.frequency",
+            "chip",
+            {"type": "text", "raw": "일주일에 몇 번"},
+            llm_value,
+            0.9,
+            1,
+            slot=PLAN_CATALOG.by_key["goals.frequency"],
+            has_chip_options=True,
+        )
+        == expected
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P5 — heaviest 는 사용자가 적은 목표 중에서만 고른다 (유령 목표 방지)
+#
+# 보기가 런타임 보기(목표 제목)라 카탈로그 검증이 없고, LLM 이 "토익 900점" 을 "토익" 으로
+# 줄이면 `_build_goals` 가 목록에 없는 heaviest 를 새 목표로 덧붙여 목표가 하나 더 생겼다.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_TWO_GOALS = ["토익 900점", "캡스톤 마무리"]
+
+
+def _state_choosing_heaviest() -> InterviewState:
+    state = _state_missing("goals.heaviest")
+    state["slot_answers"]["goals.list"] = {
+        "type": "text",
+        "raw": ", ".join(_TWO_GOALS),
+        "normalized": list(_TWO_GOALS),
+    }
+    return state
+
+
+async def _answer_heaviest(state: InterviewState, raw: str) -> interview_runner.TurnResult:
+    """라우터처럼 heaviest 의 런타임 보기(`_question_options`)를 실어 답한다."""
+    return await interview_runner.submit_and_advance(
+        state=state,
+        slot_key="goals.heaviest",
+        answer_value=raw,
+        answer_type="select",
+        options=list(_TWO_GOALS),
+        slot_meta=_SLOT_META,
+    )
+
+
+def _goal_titles(state: InterviewState) -> list[str]:
+    outcome = interview_adapter.build_outcome(
+        session_id="s",
+        slot_answers=state["slot_answers"],
+        ambiguity_final=0.1,
+        end_reason="completed",
+        analysis_source="llm",
+    )
+    return [g.title for g in outcome.core_goals]
+
+
+async def test_shortened_heaviest_pick_does_not_create_a_ghost_goal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """LLM 이 보기를 줄여 낸 값("토익")은 받지 않는다 — 다시 묻고, 목표는 늘지 않는다."""
+    monkeypatch.setattr(aiClient, "run", _stub(normalized="토익"))
+    state = _state_choosing_heaviest()
+
+    result = await _answer_heaviest(state, "토익이 제일 급해요")
+
+    assert (
+        interview_adapter.is_filled_answer(result.state["slot_answers"].get("goals.heaviest"))
+        is False
+    )
+    assert result.state["next_slot_key"] == "goals.heaviest"
+    assert "토익" not in _goal_titles(result.state)
+
+
+@pytest.mark.parametrize(
+    ("llm_value", "raw", "expected"),
+    [
+        ("토익 900점", "토익이요", "토익 900점"),
+        ("토익900점", "토익이요", "토익 900점"),  # 띄어쓰기만 다르면 보기 표기로
+        ("캡스톤 마무리", "캡스톤이요", "캡스톤 마무리"),  # 첫 목표가 아닌 선택도 그대로 둔다
+    ],
+)
+async def test_heaviest_pick_that_names_an_option_is_stored(
+    monkeypatch: pytest.MonkeyPatch, llm_value: str, raw: str, expected: str
+) -> None:
+    """LLM 이 보기 중 하나를 고르면 받는다 — 목표는 적은 두 개 그대로, 그중 하나가 집중."""
+    monkeypatch.setattr(aiClient, "run", _stub(normalized=llm_value))
+    state = _state_choosing_heaviest()
+
+    result = await _answer_heaviest(state, raw)
+
+    assert result.state["slot_answers"]["goals.heaviest"] == {
+        "type": "chip",
+        "values": [expected],
+    }
+    assert _goal_titles(result.state) == _TWO_GOALS
+
+
+@pytest.mark.parametrize("raw", ["토익이 제일 급해요", "잘 모르겠어요"])
+async def test_heaviest_left_open_at_the_attempt_cap_falls_back_to_the_first_goal(
+    monkeypatch: pytest.MonkeyPatch, raw: str
+) -> None:
+    """상한까지 못 고르면 자유 입력을 목표 이름으로 만들지 않고 **첫 목표**로 정한다.
+
+    계획 쪽 규칙(`first_plan_adapter` — is_heaviest 가 없으면 첫 목표)과 같은 대상이다.
+    비워 두면 계획은 첫 목표를 다루면서도 그 목표의 마감·세션 길이 답을 잃는다.
+    """
+    monkeypatch.setattr(aiClient, "run", _stub(normalized="토익"))
+    result = await _answer_heaviest(_state_choosing_heaviest(), raw)
+    for _ in range(interview.MAX_SLOT_ATTEMPTS - 1):
+        assert result.state["next_slot_key"] == "goals.heaviest"
+        result = await _answer_heaviest(result.state, raw)
+
+    assert result.state["slot_answers"]["goals.heaviest"] == {
+        "type": "chip",
+        "values": [_TWO_GOALS[0]],
+    }
+    assert _goal_titles(result.state) == _TWO_GOALS

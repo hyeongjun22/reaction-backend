@@ -482,10 +482,10 @@ def _chip_hours(value: Mapping[str, Any] | None) -> int | None:
     `"1시간 30분"` 을 **130시간**으로 읽었다. `energy.focus_duration` 에서 같은 파서가
     "2시간 이상" 을 2분으로 만든 사고(v2.00)와 **같은 버그의 반대 방향**이다.
 
-    카탈로그 옵션은 전부 "N시간" 이라 지금까지 드러나지 않았지만, **칩 값은 옵션으로 검증되지
-    않는다** — harvest LLM 이 자유서술("주말에 30분씩 해요")에서 `normalized_value` 를 만들어
-    그대로 저장하는 경로가 있다(`interview._coerce_normalized`). 그래서 분 단위 답이 실제로
-    도달할 수 있다.
+    카탈로그 옵션은 전부 "N시간" 이라 지금까지 드러나지 않았지만, 옵션 밖 값이 **도달할 수
+    있다** — 채점·수확 LLM 값은 `interview._coerce_normalized` 가 보기로 거르지만, 사용자가
+    누른 칩 구조(`interview_runner._coerce_answer`, `drop_unknown=False`)와 이미 저장된 옛
+    세션 값은 거르지 않는다. 그래서 단위를 읽는 파서가 여전히 필요하다.
 
     한 시간 미만은 **1시간으로 올린다** — `weekly_hours` 가 정수 계약이라 0.5 를 담을 수 없고,
     0 으로 내리면 '미입력' 과 구분이 안 돼 density 프리셋으로 떨어진다. 유도 경로
