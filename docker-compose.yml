@@ -32,8 +32,9 @@ services:
       - .env
     environment:
       APP_ENV: local
-      # 로컬 docker postgres 사용 시 default. .env 에 DATABASE_URL 있으면 그게 우선.
-      DATABASE_URL: ${DATABASE_URL:-postgresql://reaction:reaction@postgres:5432/reaction}
+      # 컨테이너는 항상 compose 의 postgres 를 쓴다. `environment` 가 `env_file` 보다 우선이라
+      # .env 의 DATABASE_URL(호스트용 localhost:5432 — uv run alembic/pytest 가 씀)을 덮어쓴다.
+      DATABASE_URL: postgresql://reaction:reaction@postgres:5432/reaction
     volumes:
       - ./src:/app/src
     depends_on:
