@@ -20,6 +20,7 @@ from uuid import uuid4
 
 import pytest
 
+from reaction_backend.domain import slot_value
 from reaction_backend.llm import RunResult, aiClient
 from reaction_backend.orchestrator import (
     interview,
@@ -192,7 +193,7 @@ async def test_typed_session_length_is_not_snapped_to_a_nearby_option(
     stored = result.state["slot_answers"].get("goals.session_length")
     assert stored != {"type": "chip", "values": ["30분"]}, "사용자가 말한 적 없는 숫자다"
     assert stored == interview._pending(1, interview._RETRY_OFF_CATALOG)
-    assert interview_adapter.is_filled_answer(stored) is False
+    assert slot_value.is_settled(stored) is False
     assert result.state["next_slot_key"] == "goals.session_length"  # 같은 슬롯을 다시 묻는다
 
 
@@ -239,8 +240,8 @@ async def test_repeated_off_catalog_answer_ends_instead_of_looping(
         result = await _answer(result.state, "goals.session_length", "20분")
 
     stored = result.state["slot_answers"]["goals.session_length"]
-    assert interview_adapter.is_filled_answer(stored) is True
-    assert stored == {"type": "text", "raw": "20분"}
+    # 다시 묻지는 않되(닫힘) 사용자의 값으로 치지 않는다 — 보기 밖이라 스킵으로 닫는다(#499).
+    assert stored == {"type": "skip", "reason": "off_options"}
     # 반올림한 숫자가 계획으로 새어 나가지 않는다 — 세션 길이는 '미입력' 으로 남고
     # 계획이 기본값을 쓴다는 걸 분량 경고가 사용자에게 그대로 말한다.
     assert interview_adapter.chip_duration_min(stored) is None
@@ -260,7 +261,7 @@ def test_off_catalog_retry_hint_does_not_blame_and_shows_the_options() -> None:
     [
         (1, (interview._pending(1, interview._RETRY_OFF_CATALOG), False)),
         (2, (interview._pending(2, interview._RETRY_OFF_CATALOG), False)),
-        (interview.MAX_SLOT_ATTEMPTS, ({"type": "text", "raw": "하루종일"}, True)),
+        (interview.MAX_SLOT_ATTEMPTS, ({"type": "skip", "reason": "off_options"}, True)),
     ],
 )
 def test_decide_storage_reasks_optioned_chip_slots(
@@ -291,7 +292,7 @@ def test_decide_storage_still_skips_when_the_user_says_there_is_none() -> None:
         0.1,
         1,
         has_chip_options=True,
-    ) == (interview._SKIP_MARKER, True)
+    ) == ({"type": "skip", "reason": "declined"}, True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -458,7 +459,7 @@ async def test_llm_skip_signal_still_closes_an_optioned_chip_slot(
 
     result = await _answer(state, "recovery.tone", "그건 패스할게요")
 
-    assert result.state["slot_answers"]["recovery.tone"] == interview._SKIP_MARKER
+    assert result.state["slot_answers"]["recovery.tone"] == {"type": "skip", "reason": "llm"}
 
 
 @pytest.mark.parametrize(
@@ -540,10 +541,7 @@ async def test_shortened_heaviest_pick_does_not_create_a_ghost_goal(
 
     result = await _answer_heaviest(state, "토익이 제일 급해요")
 
-    assert (
-        interview_adapter.is_filled_answer(result.state["slot_answers"].get("goals.heaviest"))
-        is False
-    )
+    assert slot_value.is_settled(result.state["slot_answers"].get("goals.heaviest")) is False
     assert result.state["next_slot_key"] == "goals.heaviest"
     assert "토익" not in _goal_titles(result.state)
 
@@ -576,10 +574,11 @@ async def test_heaviest_pick_that_names_an_option_is_stored(
 async def test_heaviest_left_open_at_the_attempt_cap_falls_back_to_the_first_goal(
     monkeypatch: pytest.MonkeyPatch, raw: str
 ) -> None:
-    """상한까지 못 고르면 자유 입력을 목표 이름으로 만들지 않고 **첫 목표**로 정한다.
+    """상한까지 못 고르면 자유 입력을 목표 이름으로 만들지 않고 **첫 목표**를 집중으로 읽는다.
 
     계획 쪽 규칙(`first_plan_adapter` — is_heaviest 가 없으면 첫 목표)과 같은 대상이다.
-    비워 두면 계획은 첫 목표를 다루면서도 그 목표의 마감·세션 길이 답을 잃는다.
+    저장은 스킵이다 — 시스템이 고른 값은 사용자의 답이 아니다(#499,
+    `tests/test_interview_skip_semantics.py`). 대체는 읽는 쪽(`resolved_heaviest`)이 한다.
     """
     monkeypatch.setattr(aiClient, "run", _stub(normalized="토익"))
     result = await _answer_heaviest(_state_choosing_heaviest(), raw)
@@ -587,8 +586,6 @@ async def test_heaviest_left_open_at_the_attempt_cap_falls_back_to_the_first_goa
         assert result.state["next_slot_key"] == "goals.heaviest"
         result = await _answer_heaviest(result.state, raw)
 
-    assert result.state["slot_answers"]["goals.heaviest"] == {
-        "type": "chip",
-        "values": [_TWO_GOALS[0]],
-    }
+    assert result.state["slot_answers"]["goals.heaviest"]["type"] == "skip"
     assert _goal_titles(result.state) == _TWO_GOALS
+    assert interview_adapter.resolved_heaviest(result.state["slot_answers"]) == _TWO_GOALS[0]

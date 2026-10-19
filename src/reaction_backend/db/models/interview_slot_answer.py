@@ -3,10 +3,13 @@
 핵심:
 - (session_id, slot_key) UNIQUE — AI가 같은 슬롯 재질문 시 INSERT 아닌 UPDATE
 - 19 슬롯 카탈로그 (identity/goals/time/energy/recovery/constraints)
-- value 는 JSONB:
+- value 는 JSONB — 모양과 읽기·쓰기는 `domain/slot_value` 하나가 정한다:
   * chip 응답:  {"type": "chip", "values": ["학업", "건강"]}
   * 자유 입력:  {"type": "text", "raw": "캡스톤, 토익", "normalized": ["캡스톤", "토익"]}
   * 슬라이더:    {"type": "range", "start": "09:00", "end": "23:00"}
+  * 자료 확정:  {"type": "spec", "items": [...]}
+  * 재질문 대기: {"type": "pending", "attempts": 2}
+  * 스킵:        {"type": "skip", "reason": "declined"} (예전 행은 빈 텍스트 {"type":"text","raw":""})
 - clarity_score: 0~1 (LLM 또는 룰 기반 채점).
   ⚠️ **프로덕션에서 한 번도 쓰이지 않는다.** `upsert_slot_answer` 의 세 호출부
   (`routes/interview.py`·`routes/materials.py` ×2) 모두 이 인자를 넘기지 않아 항상

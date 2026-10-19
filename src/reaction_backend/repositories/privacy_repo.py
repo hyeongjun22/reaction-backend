@@ -160,8 +160,9 @@ class PrivacyRepo:
         )
 
         # ── 사용자가 직접 쓴 자유서술 ──
-        # 인터뷰 자유 입력 답(붙여넣은 자료 포함). 빈 답("건너뜀" 표식)은 그대로 둔다 — 가리면
-        # 건너뛴 슬롯이 답한 슬롯으로 바뀐다. chip·range·spec 답은 선택지라 남긴다.
+        # 인터뷰 자유 입력 답(붙여넣은 자료 포함). 예전 스킵 표식(빈 텍스트)은 그대로 둔다 —
+        # 가리면 건너뛴 슬롯이 답한 슬롯으로 바뀐다. 지금 스킵(`type: skip`)은 원문을 담지 않아
+        # 가릴 게 없다(`domain/slot_value`). chip·range·spec 답은 선택지라 남긴다.
         session_ids = select(InterviewSession.id).where(InterviewSession.user_id == user_id)
         masked += await self._run(
             update(InterviewSlotAnswer)

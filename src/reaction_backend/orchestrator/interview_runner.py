@@ -22,6 +22,7 @@ from uuid import UUID
 from langchain_core.runnables import RunnableConfig
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from reaction_backend.domain import slot_value as sv
 from reaction_backend.orchestrator import interview
 from reaction_backend.orchestrator.interview import InterviewState
 from reaction_backend.orchestrator.interview_catalog import (
@@ -38,6 +39,8 @@ from reaction_backend.schemas.ultimate_goal import UltimateGoalOutcome
 
 __all__ = [
     "TurnResult",
+    "UnsupportedAnswerError",
+    "coerce_client_answer",
     "finish_early",
     "resume",
     "start_interview",
@@ -88,10 +91,18 @@ def _config(
     }
 
 
-def _coerce_answer(value: Any, *, slot: InterviewSlot | None = None) -> dict[str, Any]:
+class UnsupportedAnswerError(ValueError):
+    """클라이언트가 보낸 답이 사용자 답 모양(칩·텍스트·구간)이 아니다 — 라우트가 422 로 바꾼다."""
+
+
+def coerce_client_answer(value: Any, *, slot: InterviewSlot | None = None) -> dict[str, Any]:
     """라우터가 받은 JsonValue 를 slot_answers value 형식으로 환원.
 
-    이미 `{"type": ...}` 형태면 그대로 신뢰한다(클라이언트가 카탈로그 answerType 대로 보냄).
+    클라이언트가 보낼 수 있는 건 **사용자 답**뿐이다 — 칩·텍스트·구간 dict, 그리고 그 약식(목록 =
+    칩, `{start, end}` = 구간, 나머지 스칼라 = 텍스트). 대기(pending)·스킵(skip)·자료 확정(spec)은
+    서버만 쓰는 표시라 받지 않는다(`UnsupportedAnswerError`). 예전엔 `{"type": ...}` 가 붙은
+    dict 를 그대로 믿어, 클라이언트가 `pending` 으로 재질문 횟수를 되돌리거나 `skip` 으로 핵심
+    슬롯을 닫을 수 있었다.
 
     칩은 **표기만** 카탈로그 옵션으로 정규화한다(`drop_unknown=False`) — `"2시간이상"` 처럼
     공백이 빠졌거나 `"120분"` 처럼 다른 표기로 온 값을 옵션 표기로 맞춘다. 여기서는 **거부하지
@@ -100,21 +111,27 @@ def _coerce_answer(value: Any, *, slot: InterviewSlot | None = None) -> dict[str
     개편됐다) 옛 척도를 든 클라이언트를 그 루프에 빠뜨릴 수 없다.
     신뢰할 수 없는 출처(harvest LLM · 프로필 시드)는 반대로 **버리는** 정책을 쓴다.
     """
-    if isinstance(value, dict) and value.get("type") == "chip":
-        chips = value.get("values")
-        if isinstance(chips, list):
-            return {
-                **value,
-                "values": canonical_chip_values(slot, chips, drop_unknown=False),
-            }
-        return value
-    if isinstance(value, dict) and "type" in value:
-        return value
-    if isinstance(value, dict) and "start" in value and "end" in value:
-        return {"type": "range", "start": value["start"], "end": value["end"]}
     if isinstance(value, list):
-        return {"type": "chip", "values": canonical_chip_values(slot, value, drop_unknown=False)}
-    return {"type": "text", "raw": str(value)}
+        return sv.dump(sv.ChipAnswer(tuple(canonical_chip_values(slot, value, drop_unknown=False))))
+    if not isinstance(value, dict):
+        return sv.dump(sv.TextAnswer(str(value)))
+    kind = value.get("type")
+    if kind is None and "start" in value and "end" in value:
+        kind = "range"
+    if kind == "chip" and isinstance(value.get("values"), list):
+        chips = canonical_chip_values(slot, value["values"], drop_unknown=False)
+        return sv.dump(sv.ChipAnswer(tuple(chips)))
+    if (
+        kind == "range"
+        and isinstance(value.get("start"), str)
+        and isinstance(value.get("end"), str)
+    ):
+        return sv.dump(sv.RangeAnswer(value["start"], value["end"]))
+    if kind == "text" and isinstance(value.get("raw"), str):
+        normalized = value.get("normalized")
+        text_items = tuple(str(v) for v in normalized) if isinstance(normalized, list) else None
+        return sv.dump(sv.TextAnswer(value["raw"], text_items))
+    raise UnsupportedAnswerError(f"unsupported answer shape: type={kind!r}")
 
 
 async def start_interview(
@@ -164,7 +181,7 @@ async def submit_and_advance(
     config = _config(
         session, tone_mode, answer_type=answer_type, options=options, slot_meta=slot_meta
     )
-    coerced = _coerce_answer(answer_value, slot=CATALOGS[state["kind"]].by_key.get(slot_key))
+    coerced = coerce_client_answer(answer_value, slot=CATALOGS[state["kind"]].by_key.get(slot_key))
     state = {**state, "last_answer": coerced, "last_slot_key": slot_key}
 
     state = await interview.receive_answer(state, config)

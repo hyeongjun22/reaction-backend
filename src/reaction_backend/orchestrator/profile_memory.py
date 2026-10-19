@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from reaction_backend.db.models.behavioral_profile import BehavioralProfile
 from reaction_backend.db.models.interaction_style import InteractionStyle
 from reaction_backend.db.models.user import User
+from reaction_backend.domain import slot_value as sv
 from reaction_backend.orchestrator.interview_catalog import (
     PLAN_CATALOG,
     canonical_chip_values,
@@ -133,7 +134,7 @@ def seed_slots_from_profile(
             continue
         values = canonical_chip_values(PLAN_CATALOG.by_key.get(slot_key), [value])
         if values:
-            seed[slot_key] = {"type": "chip", "values": values}
+            seed[slot_key] = sv.dump(sv.ChipAnswer(tuple(values)))
     return seed
 
 
@@ -143,10 +144,9 @@ def _profile_raw_of(slot_key: str, answer: Mapping[str, Any]) -> str | None:
     나머지 슬롯(집중 길이·최소 단위·휴식 수용)은 칩 ↔ 프로필이 일대일이라 비교할 필요가
     없다(None → 늘 프로필 시드를 쓴다, 값도 같다).
     """
-    chips = answer.get("values") if answer.get("type") == "chip" else None
-    if not isinstance(chips, list) or not chips:
+    labels = sv.chips(answer)
+    if not labels:
         return None
-    labels = [str(c) for c in chips]
     if slot_key == "recovery.tone":
         return _INTERACTION_TO_TONE.get(recovery_tone_enum(labels[0]))
     if slot_key == "time.peak_window":

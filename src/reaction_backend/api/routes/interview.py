@@ -43,6 +43,7 @@ from reaction_backend.db.models.interview_session import InterviewSession as Int
 from reaction_backend.db.models.interview_slot_answer import InterviewSlotAnswer
 from reaction_backend.db.models.user import User
 from reaction_backend.db.session import get_db
+from reaction_backend.domain import slot_value as sv
 from reaction_backend.orchestrator import (
     first_plan_adapter,
     interview,
@@ -137,8 +138,8 @@ async def _seed_for_single_goal(
     if goal is None:
         raise _goal_not_found()
     return {
-        "goals.list": {"type": "text", "raw": goal.title, "normalized": [goal.title]},
-        "goals.heaviest": {"type": "chip", "values": [goal.title]},
+        "goals.list": sv.dump(sv.TextAnswer(goal.title, (goal.title,))),
+        "goals.heaviest": sv.dump(sv.ChipAnswer((goal.title,))),
     }
 
 
@@ -250,17 +251,7 @@ def _question_options(
             if t and t not in seen:
                 seen.add(t)
                 options.append(t)
-        goals = slot_answers.get("goals.list")
-        typed: list[str] = []
-        if isinstance(goals, dict) and goals.get("type") == "text":
-            norm = goals.get("normalized")
-            if isinstance(norm, list):
-                typed = [str(x) for x in norm if str(x).strip()]
-            else:
-                raw = goals.get("raw")
-                if isinstance(raw, str) and raw.strip():
-                    typed = [raw.strip()]
-        for t in typed:
+        for t in sv.items(slot_answers.get("goals.list")):
             if t not in seen:
                 seen.add(t)
                 options.append(t)
@@ -478,14 +469,18 @@ async def _finalize_and_respond(
 async def _carry_over_slots(
     repo: InterviewRepo, user_id: UUID, *, source_kind: str, keys: frozenset[str]
 ) -> dict[str, dict[str, Any]]:
-    """`source_kind` 의 가장 최근 '정상 종료' 세션에서 `keys` 슬롯 원답을 회수. 없으면 빈 dict."""
+    """`source_kind` 의 가장 최근 '정상 종료' 세션에서 `keys` 슬롯 원답을 회수. 없으면 빈 dict.
+
+    **사용자가 실제로 답한 슬롯만**(`slot_value.has_answer`) — 스킵한 슬롯을 넘기면 다음 인터뷰가
+    그 칸을 '이미 답함' 으로 보고 다시 묻지 않는다(#499).
+    """
     prev = await repo.get_latest_finished(user_id, kind=source_kind)
     if prev is None:
         return {}
     out: dict[str, dict[str, Any]] = {}
     for r in await repo.list_slot_answers(prev.id):
         value = r.value
-        if value is not None and r.slot_key in keys and interview_adapter.is_filled_answer(value):
+        if value is not None and r.slot_key in keys and sv.has_answer(value):
             out[r.slot_key] = value
     return out
 
@@ -703,6 +698,17 @@ async def submit_answer(
                 http_status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 field="slotKey",
             )
+        try:
+            answer_value = interview_runner.coerce_client_answer(body.value, slot=answered_slot)
+        except interview_runner.UnsupportedAnswerError as e:
+            # 대기·스킵·자료 확정 같은 서버 전용 표시나 모양 없는 dict — 받으면 클라이언트가
+            # 재질문 횟수를 되돌리거나 핵심 슬롯을 스킵으로 닫을 수 있다.
+            raise ApiError(
+                ErrorCode.COMMON_VALIDATION_ERROR,
+                "답 형식을 알 수 없어요.",
+                http_status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                field="value",
+            ) from e
         if body.client_turn != row.total_turns:
             # 클라이언트는 직전 응답의 `totalTurns` 를 `clientTurn` 으로 보낸다. 다르면 그 사이
             # 다른 요청(재전송·다른 기기)이 턴을 진행시킨 것이다 — 처리하면 같은 답을 두 번
@@ -722,7 +728,7 @@ async def submit_answer(
         result = await interview_runner.submit_and_advance(
             state=state,
             slot_key=body.slot_key,
-            answer_value=body.value,
+            answer_value=answer_value,
             session=session,
             tone_mode=user.tone_mode,
             answer_type=answered_slot.answer_type,

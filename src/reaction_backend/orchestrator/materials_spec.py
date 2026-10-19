@@ -25,6 +25,7 @@ from datetime import date
 from typing import Any, Literal
 
 from reaction_backend.config import Settings
+from reaction_backend.domain import slot_value as sv
 from reaction_backend.integrations.aladin import client as aladin_client
 from reaction_backend.integrations.nl_seoji import client as seoji_client
 from reaction_backend.integrations.youtube import client as youtube_client
@@ -283,7 +284,7 @@ def spec_slot_value(
 ) -> dict[str, Any]:
     """`goals.materials` 슬롯에 쓸 dict — 1~2건(책 1개·영상 1개까지)을 `items` 로 담는다.
     `book_pace` 는 책 항목에만 붙는다(영상 항목은 무시)."""
-    return {"type": "spec", "items": [_spec_item_dict(d, book_pace=book_pace) for d in details]}
+    return sv.dump(sv.SpecAnswer(tuple(_spec_item_dict(d, book_pace=book_pace) for d in details)))
 
 
 __all__ = ["book_detail", "compute_book_pace", "spec_slot_value", "video_detail"]

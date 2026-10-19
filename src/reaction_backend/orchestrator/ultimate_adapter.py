@@ -18,7 +18,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from datetime import date
 from typing import Any, Literal, cast
 
@@ -26,6 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from reaction_backend.db.models.goal import Goal
+from reaction_backend.domain import slot_value as sv
 from reaction_backend.orchestrator import interview_adapter
 from reaction_backend.orchestrator.goal_policy import clip_goal_title
 from reaction_backend.orchestrator.interview_catalog import ULTIMATE_REQUIRED_SLOT_KEYS
@@ -59,45 +60,6 @@ ULTIMATE_CARRY_OVER_SLOT_KEYS: frozenset[str] = frozenset(
 _NOT_SET = "아직 정하지 않음"
 
 
-def is_filled_answer(value: Mapping[str, Any] | None) -> bool:
-    """슬롯 값이 실질적으로 채워진 답인지 (`interview_adapter.is_filled_answer` 와 동일 규약)."""
-    if not value:
-        return False
-    return value.get("type") != "pending"
-
-
-def _chip_values(value: Mapping[str, Any] | None) -> list[str]:
-    if not value or value.get("type") != "chip":
-        return []
-    raw = value.get("values")
-    return [str(v) for v in raw] if isinstance(raw, Sequence) and not isinstance(raw, str) else []
-
-
-def _text_raw(value: Mapping[str, Any] | None) -> str | None:
-    if not value or value.get("type") != "text":
-        return None
-    raw = value.get("raw")
-    return str(raw) if isinstance(raw, str) and raw.strip() else None
-
-
-def _text_items(value: Mapping[str, Any] | None) -> list[str]:
-    """text 슬롯의 normalized 리스트(없으면 raw 1개) — constraints·pillars_hint 처럼
-
-    한 답에 여러 항목이 섞일 수 있는 슬롯용(`interview_adapter._text_items` 와 동일 규약).
-    """
-    if not value or value.get("type") != "text":
-        return []
-    norm = value.get("normalized")
-    if isinstance(norm, Sequence) and not isinstance(norm, str):
-        return [str(v) for v in norm if str(v).strip()]
-    raw = value.get("raw")
-    return [str(raw)] if isinstance(raw, str) and raw.strip() else []
-
-
-def _first(items: Sequence[str]) -> str | None:
-    return items[0] if items else None
-
-
 _HORIZON_YEARS: dict[str, int | None] = {
     "3년": 3,
     "5년": 5,
@@ -109,7 +71,7 @@ _HORIZON_YEARS: dict[str, int | None] = {
 
 
 def _horizon_years(value: Mapping[str, Any] | None) -> int | None:
-    chip = _first(_chip_values(value))
+    chip = sv.first_chip(value)
     return _HORIZON_YEARS.get(chip) if chip else None
 
 
@@ -119,12 +81,12 @@ def summary_variables(slot_answers: Mapping[str, Mapping[str, Any] | None]) -> d
     문자열로 추출(룰). `interview._summary_variables` 의 궁극목표판.
     """
     return {
-        "statement": _text_raw(slot_answers.get("ultimate.statement")) or _NOT_SET,
-        "measure": _text_raw(slot_answers.get("ultimate.measure")) or _NOT_SET,
-        "horizon": _first(_chip_values(slot_answers.get("ultimate.horizon"))) or _NOT_SET,
-        "identity": _text_raw(slot_answers.get("ultimate.identity")) or _NOT_SET,
-        "current_position": _text_raw(slot_answers.get("ultimate.current_position")) or _NOT_SET,
-        "constraints": ", ".join(_text_items(slot_answers.get("ultimate.constraints"))) or _NOT_SET,
+        "statement": sv.text(slot_answers.get("ultimate.statement")) or _NOT_SET,
+        "measure": sv.text(slot_answers.get("ultimate.measure")) or _NOT_SET,
+        "horizon": sv.first_chip(slot_answers.get("ultimate.horizon")) or _NOT_SET,
+        "identity": sv.text(slot_answers.get("ultimate.identity")) or _NOT_SET,
+        "current_position": sv.text(slot_answers.get("ultimate.current_position")) or _NOT_SET,
+        "constraints": ", ".join(sv.items(slot_answers.get("ultimate.constraints"))) or _NOT_SET,
     }
 
 
@@ -140,27 +102,30 @@ def build_ultimate_outcome(
 
     빈 필수 슬롯은 빈 문자열/빈 리스트로 두고 `unresolved_slots` 에 키를 남긴다 — `GoalCandidate`
     처럼 `min_length=1` 계약이 없어 placeholder sentinel 이 필요 없다(설계서 §5.4 근거 1).
+    스킵으로 닫힌 슬롯도 남긴다(#499).
     """
     # 세는 규칙은 계획 인터뷰와 **같은 함수** — ultimate.* 9개엔 지금 유도 슬롯이 없어
     # 결과가 같지만, 판정이 갈릴 자리를 애초에 만들지 않는다(#weekly_time 이 그렇게 샜다).
-    unresolved = interview_adapter.open_required_keys(ULTIMATE_REQUIRED_SLOT_KEYS, slot_answers)
+    unresolved = interview_adapter.unresolved_required_keys(
+        ULTIMATE_REQUIRED_SLOT_KEYS, slot_answers
+    )
     return UltimateGoalOutcome(
         session_id=session_id,
         generated_at=now_kst(),
         end_reason=end_reason,
         ambiguity_final=ambiguity_final,
         analysis_source=analysis_source,
-        statement=_text_raw(slot_answers.get("ultimate.statement")) or "",
-        domain=_first(_chip_values(slot_answers.get("ultimate.domain"))) or "",
+        statement=sv.text(slot_answers.get("ultimate.statement")) or "",
+        domain=sv.first_chip(slot_answers.get("ultimate.domain")) or "",
         horizon_years=_horizon_years(slot_answers.get("ultimate.horizon")),
-        measure=_text_raw(slot_answers.get("ultimate.measure")) or "",
-        success_image=_text_raw(slot_answers.get("ultimate.success_image")) or "",
-        identity_note=_text_raw(slot_answers.get("ultimate.identity")) or "",
-        current_position=_text_raw(slot_answers.get("ultimate.current_position")) or "",
-        constraints=_text_items(slot_answers.get("ultimate.constraints")),
-        values=_chip_values(slot_answers.get("ultimate.values")),
-        assets=_text_raw(slot_answers.get("ultimate.assets")),
-        pillars_hint=_text_items(slot_answers.get("ultimate.pillars_hint")),
+        measure=sv.text(slot_answers.get("ultimate.measure")) or "",
+        success_image=sv.text(slot_answers.get("ultimate.success_image")) or "",
+        identity_note=sv.text(slot_answers.get("ultimate.identity")) or "",
+        current_position=sv.text(slot_answers.get("ultimate.current_position")) or "",
+        constraints=sv.items(slot_answers.get("ultimate.constraints")),
+        values=sv.chips(slot_answers.get("ultimate.values")),
+        assets=sv.text(slot_answers.get("ultimate.assets")),
+        pillars_hint=sv.items(slot_answers.get("ultimate.pillars_hint")),
         unresolved_slots=unresolved,
     )
 
@@ -265,7 +230,6 @@ async def materialize_ultimate_goal(
 __all__ = [
     "ULTIMATE_CARRY_OVER_SLOT_KEYS",
     "build_ultimate_outcome",
-    "is_filled_answer",
     "materialize_ultimate_goal",
     "resolve_outcome",
     "summary_variables",

@@ -47,6 +47,7 @@ from reaction_backend.db.models.interview_session import InterviewSession
 from reaction_backend.db.models.interview_slot_answer import InterviewSlotAnswer
 from reaction_backend.db.models.user import User
 from reaction_backend.db.session import get_sessionmaker
+from reaction_backend.domain import slot_value as sv
 from reaction_backend.orchestrator.interview_adapter import chip_duration_min
 from reaction_backend.orchestrator.interview_catalog import PLAN_SLOTS
 
@@ -99,11 +100,8 @@ def polluted_profiles_stmt(user_email: str | None = None) -> Select[tuple[Behavi
 
 
 def _chip_of(value: Any) -> str | None:
-    """슬롯 답 JSON → 첫 칩 문자열. chip 타입이 아니면 None(`_chip_values` 와 같은 규약)."""
-    if not isinstance(value, dict) or value.get("type") != "chip":
-        return None
-    chips = value.get("values")
-    return str(chips[0]) if isinstance(chips, list) and chips else None
+    """슬롯 답 JSON → 첫 칩 문자열. chip 타입이 아니면 None(`slot_value.first_chip`)."""
+    return sv.first_chip(value) if isinstance(value, dict) else None
 
 
 def focus_answers_stmt(user_id: UUID) -> Select[tuple[Any]]:
@@ -156,7 +154,7 @@ async def collect(session: AsyncSession, user_email: str | None = None) -> list[
                 current_attention_span=profile.attention_span,
                 current_chunk=profile.time_chunk_preference,
                 chip_answer=chip,
-                recomputed=chip_duration_min({"type": "chip", "values": [chip]}) if chip else None,
+                recomputed=chip_duration_min(sv.dump(sv.ChipAnswer((chip,)))) if chip else None,
                 skipped_seeded=skipped,
             )
         )

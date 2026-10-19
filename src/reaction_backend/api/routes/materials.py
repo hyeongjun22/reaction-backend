@@ -50,6 +50,7 @@ from reaction_backend.api.deps import CurrentUser
 from reaction_backend.config import get_settings
 from reaction_backend.db.models.interview_session import InterviewSession
 from reaction_backend.db.session import get_db
+from reaction_backend.domain import slot_value as sv
 from reaction_backend.llm import aiClient
 from reaction_backend.llm.tool_executor import GroundedResult
 from reaction_backend.orchestrator import materials_catalog, materials_spec
@@ -336,7 +337,7 @@ async def confirm_materials(
     await repo.upsert_slot_answer(
         session_row.id,
         _MATERIALS_SLOT,
-        {"type": "text", "raw": text},
+        sv.dump(sv.TextAnswer(text)),
         is_required=True,
     )
     await session.commit()

@@ -14,8 +14,9 @@ from uuid import uuid4
 
 import pytest
 
+from reaction_backend.domain import slot_value
 from reaction_backend.llm import RunResult, aiClient
-from reaction_backend.orchestrator import interview, interview_catalog, interview_runner
+from reaction_backend.orchestrator import interview_catalog, interview_runner
 from reaction_backend.schemas.interview import (
     AmbiguityUpdate,
     AnswerIntake,
@@ -156,7 +157,7 @@ async def test_seed_answers_skip_durable_slots(monkeypatch: pytest.MonkeyPatch) 
     remaining = sum(
         1
         for k in interview_catalog.PLAN_CATALOG.required_keys
-        if not interview._is_filled(result.state["slot_answers"].get(k))
+        if not slot_value.is_settled(result.state["slot_answers"].get(k))
     )
     assert remaining == 11
     # 이어받은 값은 그대로 상태에 있다(끝까지 가면 outcome 에 실린다).
@@ -177,7 +178,7 @@ async def test_low_clarity_reasks_same_slot(monkeypatch: pytest.MonkeyPatch) -> 
     assert result.done is False
     assert result.state["next_slot_key"] == first_slot  # 미충족 → 같은 슬롯 재질문
     # 실제 답으로 안 채워짐 — pending(재질문 대기) 마커라 _is_filled 는 False
-    assert not interview._is_filled(result.state["slot_answers"].get(first_slot))
+    assert not slot_value.is_settled(result.state["slot_answers"].get(first_slot))
 
 
 async def test_constrained_answer_stored_despite_low_clarity(
@@ -190,7 +191,7 @@ async def test_constrained_answer_stored_despite_low_clarity(
 
     ⚠️ **값을 뚝뚝히 단언해야 한다.** 예전엔 `first_slot in slot_answers` 만 봤고, 그건 이
     테스트가 약속하는 것을 안 지켰다 — `_decide_storage` 의 `is_constrained` 단축을 지우면
-    답이 `_SKIP_MARKER`(`{"type":"text","raw":""}`)로 들어가는데, **키는 그대로 있고**
+    답이 스킵(`{"type":"skip",…}`)으로 들어가는데, **키는 그대로 있고**
     다음 슬롯으로도 넘어가서 둘 다 통과했다. 즉 사용자의 "1학년" 이 **통째로 버려지는**
     회귀를 이 테스트가 놓치고 있었다(#448 감사에서 변이로 확인)."""
     monkeypatch.setattr(aiClient, "run", _stub(clarity=0.1))  # clarity 임계 미만
@@ -297,7 +298,7 @@ async def test_skip_answer_advances_without_reask(monkeypatch: pytest.MonkeyPatc
         answer_type="text",
     )
     # 스킵 마커로 채워지고(빈 text) 다음 슬롯으로 진행 — 같은 슬롯 재질문 안 함
-    assert result.state["slot_answers"][first_slot] == {"type": "text", "raw": ""}
+    assert result.state["slot_answers"][first_slot] == {"type": "skip", "reason": "declined"}
     assert result.state["next_slot_key"] != first_slot
 
 
@@ -352,7 +353,7 @@ async def test_critical_slot_rejects_skip_then_best_effort(
         state=result.state, slot_key="goals.list", answer_value="없어", answer_type="text"
     )
     assert result.state["next_slot_key"] == "goals.list"
-    assert not interview._is_filled(result.state["slot_answers"].get("goals.list"))
+    assert not slot_value.is_settled(result.state["slot_answers"].get("goals.list"))
 
     # 2회차 재질문에도 skip → 여전히 goals.list
     result = await interview_runner.submit_and_advance(
@@ -417,7 +418,7 @@ async def test_multiple_goals_still_asks_heaviest(
         answer_value="캡스톤, 토익",  # 복수 목표
         answer_type="text",
     )
-    assert not interview._is_filled(result.state["slot_answers"].get("goals.heaviest"))
+    assert not slot_value.is_settled(result.state["slot_answers"].get("goals.heaviest"))
     assert result.state["next_slot_key"] == "goals.heaviest"  # 정상 질문
 
 

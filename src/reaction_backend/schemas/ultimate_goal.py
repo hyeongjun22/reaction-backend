@@ -54,7 +54,8 @@ class UltimateGoalOutcome(CamelModel):
     # 8축 시드 — 비면 만다라 생성(Stage A)이 도메인 프리셋으로 채운다. 사용자가 직접 말한
     # 축은 만다라 승인 후 `goal_nodes.locked=true` 로 재생성이 못 건드리게 한다.
     pillars_hint: list[str] = Field(default_factory=list)  # ultimate.pillars_hint
-    unresolved_slots: list[str] = Field(default_factory=list)  # default 처리된 필수 슬롯 키
+    # default 처리된 필수 슬롯 키 — 아직 안 물은 슬롯 + 스킵으로 닫힌 슬롯(#499).
+    unresolved_slots: list[str] = Field(default_factory=list)
 
 
 class UltimateGoalRequest(CamelModel):

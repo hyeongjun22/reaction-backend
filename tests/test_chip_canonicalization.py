@@ -21,7 +21,7 @@ from reaction_backend.orchestrator.interview_catalog import (
     canonical_chip,
     canonical_chip_values,
 )
-from reaction_backend.orchestrator.interview_runner import _coerce_answer
+from reaction_backend.orchestrator.interview_runner import coerce_client_answer
 
 FOCUS = PLAN_CATALOG.by_key["energy.focus_duration"]
 WEEKLY = PLAN_CATALOG.by_key["goals.weekly_time"]
@@ -120,18 +120,18 @@ def test_client_answer_is_normalized_but_never_dropped() -> None:
     카탈로그 옵션은 시간이 지나며 바뀐다(주당 시간 척도가 한 번 개편됐다). 옛 척도를 든
     클라이언트를 그 루프에 빠뜨릴 수 없어, 여기서는 표기 정규화만 얻고 거부는 하지 않는다.
     """
-    assert _coerce_answer(["2시간이상"], slot=FOCUS) == {
+    assert coerce_client_answer(["2시간이상"], slot=FOCUS) == {
         "type": "chip",
         "values": ["2시간 이상"],
     }
     # 옛 척도 값이 와도 살아남는다(거부하면 인터뷰가 멈춘다).
     legacy: Any = {"type": "chip", "values": ["6시간"]}
-    assert _coerce_answer(legacy, slot=WEEKLY) == {"type": "chip", "values": ["6시간"]}
+    assert coerce_client_answer(legacy, slot=WEEKLY) == {"type": "chip", "values": ["6시간"]}
 
 
 def test_client_answer_without_slot_is_unchanged() -> None:
-    assert _coerce_answer(["아무거나"], slot=None) == {"type": "chip", "values": ["아무거나"]}
-    assert _coerce_answer("자유 서술", slot=FOCUS) == {"type": "text", "raw": "자유 서술"}
+    assert coerce_client_answer(["아무거나"], slot=None) == {"type": "chip", "values": ["아무거나"]}
+    assert coerce_client_answer("자유 서술", slot=FOCUS) == {"type": "text", "raw": "자유 서술"}
 
 
 def test_duplicate_chips_collapse_after_normalization() -> None:

@@ -26,6 +26,7 @@ from uuid import UUID
 from reaction_backend.db.models.behavioral_profile import BehavioralProfile
 from reaction_backend.db.models.goal_node import GoalNode
 from reaction_backend.db.models.interaction_style import InteractionStyle
+from reaction_backend.domain import slot_value as sv
 from reaction_backend.orchestrator import profile_memory
 from reaction_backend.schemas.planning import MilestoneDraft
 
@@ -84,11 +85,9 @@ def slots_from_profile(
     if behavioral is not None:
         start, end = behavioral.preferred_start_time, behavioral.preferred_end_time
         if start is not None and end is not None:
-            slots["time.activity_window"] = {
-                "type": "range",
-                "start": start.strftime("%H:%M"),
-                "end": end.strftime("%H:%M"),
-            }
+            slots["time.activity_window"] = sv.dump(
+                sv.RangeAnswer(start.strftime("%H:%M"), end.strftime("%H:%M"))
+            )
     return slots
 
 

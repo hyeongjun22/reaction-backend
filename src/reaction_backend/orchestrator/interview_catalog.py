@@ -18,6 +18,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from reaction_backend.domain import slot_value as sv
 from reaction_backend.orchestrator import interview_adapter
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -612,7 +613,7 @@ def duration_minutes_of(text: str) -> int | None:
     normalized = _KO_NUMERAL_RE.sub(
         lambda m: _KO_DURATION_NUMERALS[m.group(1)] + m.group(2), normalized
     )
-    return interview_adapter.chip_duration_min({"type": "chip", "values": [normalized]})
+    return interview_adapter.chip_duration_min(sv.dump(sv.ChipAnswer((normalized,))))
 
 
 def is_duration_slot(slot: InterviewSlot | None) -> bool:

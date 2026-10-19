@@ -5,15 +5,11 @@
 - **LLM 호출 0회 / DB 무관** → 경계에서 8s timeout·rate limit 실패 표면이 없다.
 - early_finish/정체로 빈 필수 슬롯은 안전한 default 로 채우고 `unresolved_slots` 에 기록.
 
-slot_answers 값 형식 (db/models/interview_slot_answer.py, value JSONB):
-- chip:  {"type": "chip",  "values": ["오전", "저녁"]}
-- text:  {"type": "text",  "raw": "...", "normalized": ["캡스톤", "토익"]}
-- range: {"type": "range", "start": "09:00", "end": "23:00"}
-- spec:  {"type": "spec", "items": [{"kind": "book"|"video", ...}, ...]} — `goals.materials`
-  전용(ADR-0010 §1 ③ `spec-confirm`). `items` 는 1~2건(책 1개·영상 1개까지). `_materials_note`
-  가 각 항목을 텍스트로 풀어 이어붙여 `materials_note` 에 싣는다 — 새 프롬프트 변수·새
-  인젝션 방어를 만들지 않고, `_text_raw`/`materials_for_prompt` 의 기존 경로를 그대로
-  통과시키기 위해서다.
+slot_answers 값 형식과 읽기 함수는 `domain/slot_value` 하나에 있다(chip·text·range·spec·
+pending·skip). 여기서 슬롯 dict 를 직접 열어 보지 않는다 — 읽기 함수가 4벌이던 시절 서로 조금씩
+달랐다. `spec`(자료 확정, ADR-0010 §1 ③)은 `_materials_note` 가 각 항목을 텍스트로 풀어
+`materials_note` 에 싣는다 — 새 프롬프트 변수·새 인젝션 방어를 만들지 않고 `materials_for_prompt`
+의 기존 경로를 그대로 통과시키기 위해서다.
 """
 
 from __future__ import annotations
@@ -21,6 +17,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
+from reaction_backend.domain import slot_value as sv
 from reaction_backend.schemas.common import now_kst
 from reaction_backend.schemas.interview import (
     AvailabilityProfile,
@@ -98,50 +95,13 @@ def is_placeholder_goal(goal: GoalCandidate) -> bool:
     return goal.confidence == 0.0 and goal.title == PLACEHOLDER_GOAL_TITLE
 
 
-def is_filled_answer(value: Mapping[str, Any] | None) -> bool:
-    """슬롯 값이 실질적으로 채워진 답인지.
-
-    빈 값(None/빈 dict)과 재질문 대기 마커(`{"type":"pending"}`)는 미충족으로 본다
-    (pending 은 시도 횟수만 누적하며 FSM 이 같은 슬롯을 다시 묻게 하는 임시 상태).
-    스킵 마커(`{"type":"text","raw":""}`)는 '없음'을 명시한 유효 답이므로 충족으로 친다.
-    """
-    if not value:
-        return False
-    return value.get("type") != "pending"
-
-
 # ─────────────────────────────────────────────────────────────────────────────
-# 값 추출 헬퍼 (discriminated by value["type"])
+# 값 추출 헬퍼 — 슬롯 값 읽기는 `domain/slot_value`, 여기는 이 어댑터 고유의 해석만
 # ─────────────────────────────────────────────────────────────────────────────
-
-
-def _chip_values(value: Mapping[str, Any] | None) -> list[str]:
-    if not value or value.get("type") != "chip":
-        return []
-    raw = value.get("values")
-    return [str(v) for v in raw] if isinstance(raw, Sequence) and not isinstance(raw, str) else []
-
-
-def _text_items(value: Mapping[str, Any] | None) -> list[str]:
-    """text 슬롯의 normalized 리스트(없으면 raw 1개)."""
-    if not value or value.get("type") != "text":
-        return []
-    norm = value.get("normalized")
-    if isinstance(norm, Sequence) and not isinstance(norm, str):
-        return [str(v) for v in norm if str(v).strip()]
-    raw = value.get("raw")
-    return [str(raw)] if isinstance(raw, str) and raw.strip() else []
-
-
-def _text_raw(value: Mapping[str, Any] | None) -> str | None:
-    if not value or value.get("type") != "text":
-        return None
-    raw = value.get("raw")
-    return str(raw) if isinstance(raw, str) and raw.strip() else None
 
 
 def _materials_note(value: Mapping[str, Any] | None) -> str | None:
-    """`goals.materials` 슬롯 → `materials_note` 텍스트. `text` 는 원문 그대로(`_text_raw`
+    """`goals.materials` 슬롯 → `materials_note` 텍스트. `text` 는 원문 그대로(`slot_value.text`
     와 동일 규칙), `spec`(ADR-0010 §1 ③)은 구조화 데이터를 텍스트로 풀어낸다. `spec` 은
     `items` 에 1~2건(책 1개·영상 1개까지, `MaterialsSpecConfirmRequest` 가 강제)을 담을 수
     있다 — 두 건이면 빈 줄로 이어붙인다("이론은 책으로, 반복 트레이닝은 영상으로" 처럼
@@ -154,14 +114,9 @@ def _materials_note(value: Mapping[str, Any] | None) -> str | None:
     처럼 항목마다 분량(분)이 붙어 있으면 그 규칙이 세션 길이까지 잡아준다(L0 핵심 발견 —
     "3. DFS & BFS [58분]" 형태로 이미 텍스트에 실려 있다).
     """
-    if not value:
-        return None
-    kind = value.get("type")
-    if kind == "text":
-        return _text_raw(value)
-    if kind == "spec":
-        return _format_materials_spec(value)
-    return None
+    if isinstance(sv.parse(value), sv.SpecAnswer):
+        return _format_materials_spec(value or {})
+    return sv.text(value)
 
 
 def _format_materials_spec(value: Mapping[str, Any]) -> str | None:
@@ -235,20 +190,16 @@ def _format_video_spec(value: Mapping[str, Any]) -> str:
 
 
 def _range(value: Mapping[str, Any] | None) -> TimeRange | None:
-    if not value or value.get("type") != "range":
-        return None
-    start, end = value.get("start"), value.get("end")
-    if isinstance(start, str) and isinstance(end, str):
-        return TimeRange(start=start, end=end)
-    return None
+    window = sv.time_range(value)
+    return TimeRange(start=window[0], end=window[1]) if window else None
 
 
 def _bool(value: Mapping[str, Any] | None, *, default: bool = False) -> bool:
     """chip 형태의 예/아니오 슬롯 해석. 첫 chip 값이 긍정 어휘면 True."""
-    chips = _chip_values(value)
-    if not chips:
+    first = sv.first_chip(value)
+    if first is None:
         return default
-    return chips[0] not in {"아니오", "no", "false", "싫어요", "거절"}
+    return first not in {"아니오", "no", "false", "싫어요", "거절"}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -267,14 +218,15 @@ def build_outcome(
     """slot_answers → InterviewOutcome. LLM 0회·순수함수.
 
     빈 필수 슬롯은 default 로 채우고 `unresolved_slots` 에 키를 남긴다 (First Plan 이
-    VALIDATING 에서 보완 질문/재입력 분기를 띄울 수 있도록).
+    VALIDATING 에서 보완 질문/재입력 분기를 띄울 수 있도록). **스킵으로 닫힌 슬롯도 남긴다** —
+    그 슬롯의 값도 default 다(#499, `unresolved_required_keys`).
     """
-    unresolved = open_required_keys(REQUIRED_SLOT_KEYS, slot_answers)
+    unresolved = unresolved_required_keys(REQUIRED_SLOT_KEYS, slot_answers)
 
     identity = IdentityContext(
-        role=_first(_chip_values(slot_answers.get("identity.role"))) or "미상",
-        season=_first(_chip_values(slot_answers.get("identity.season"))) or "미상",
-        major=_text_raw(slot_answers.get("identity.major")),
+        role=sv.first_chip(slot_answers.get("identity.role")) or "미상",
+        season=sv.first_chip(slot_answers.get("identity.season")) or "미상",
+        major=sv.text(slot_answers.get("identity.major")),
     )
 
     core_goals = _build_goals(slot_answers)
@@ -297,10 +249,6 @@ def build_outcome(
     )
 
 
-def _first(items: Sequence[str]) -> str | None:
-    return items[0] if items else None
-
-
 def _build_goals(slot_answers: Mapping[str, Mapping[str, Any] | None]) -> list[GoalCandidate]:
     """goals.list 항목들을 GoalCandidate 로. heaviest 1개는 focus tier 로 표시.
 
@@ -313,20 +261,18 @@ def _build_goals(slot_answers: Mapping[str, Mapping[str, Any] | None]) -> list[G
     않으면 사용자가 그 보기를 고른 순간 `is_heaviest` 가 어떤 후보에도 안 붙어
     (title 매칭 실패) 마감·주당시간 등 heaviest 전용 필드가 통째로 유실된다.
     """
-    titles = _text_items(slot_answers.get("goals.list"))
-    heaviest = _first(_chip_values(slot_answers.get("goals.heaviest"))) or _first(
-        _text_items(slot_answers.get("goals.heaviest"))
-    )
+    titles = sv.items(slot_answers.get("goals.list"))
+    heaviest = resolved_heaviest(slot_answers)
     if heaviest and heaviest not in titles:
         titles = [*titles, heaviest]
-    deadline = _text_raw(slot_answers.get("goals.deadlines"))  # date_picker → raw "YYYY-MM-DD"
-    success_image = _text_raw(slot_answers.get("goals.success_image"))
-    current_level = _text_raw(slot_answers.get("goals.current_level"))
+    deadline = sv.text(slot_answers.get("goals.deadlines"))  # date_picker → raw "YYYY-MM-DD"
+    success_image = sv.text(slot_answers.get("goals.success_image"))
+    current_level = sv.text(slot_answers.get("goals.current_level"))
     weekly_hours = weekly_hours_for_plan(slot_answers)
     session_length = chip_duration_min(slot_answers.get("goals.session_length"))
-    preferred_time = _first(_chip_values(slot_answers.get("goals.preferred_time")))
+    preferred_time = sv.first_chip(slot_answers.get("goals.preferred_time"))
     frequency = _chip_frequency(slot_answers.get("goals.frequency"))
-    approach_note = _text_raw(slot_answers.get("goals.approach"))
+    approach_note = sv.text(slot_answers.get("goals.approach"))
     materials_note = _materials_note(slot_answers.get("goals.materials"))
 
     if not titles:
@@ -367,7 +313,7 @@ def _build_availability(
     slot_answers: Mapping[str, Mapping[str, Any] | None],
 ) -> AvailabilityProfile:
     activity = _range(slot_answers.get("time.activity_window")) or _DEFAULT_ACTIVITY
-    peak = _chip_values(slot_answers.get("time.peak_window"))
+    peak = sv.chips(slot_answers.get("time.peak_window"))
     # no_touch_windows / fixed_block_hints 는 인터뷰에서 더 이상 채우지 않는다(#audit).
     # 둘 다 답을 받아도 **소비하는 코드가 없었다** — chip 카테고리만으로는 스케줄러가 쓸 실제
     # 시각이 없고(no_touch), 자유서술 힌트는 계획 코드 참조가 0회였다(fixed_blocks).
@@ -381,7 +327,7 @@ def _build_preferences(
     slot_answers: Mapping[str, Mapping[str, Any] | None],
 ) -> PreferenceProfile:
     return PreferenceProfile(
-        recovery_tone=_first(_chip_values(slot_answers.get("recovery.tone"))) or _DEFAULT_TONE,
+        recovery_tone=sv.first_chip(slot_answers.get("recovery.tone")) or _DEFAULT_TONE,
         rest_ok=_bool(slot_answers.get("recovery.rest_ok"), default=True),
         downscope_unit_min=(
             chip_duration_min(slot_answers.get("recovery.downscope_unit")) or _DEFAULT_DOWNSCOPE_MIN
@@ -393,8 +339,8 @@ def _build_preferences(
         # 붕괴하고 주당 분량이 30분이 됐다(정상 360분). `goals.session_length` 는 처음부터
         # 이 파서를 쓰고 있었다.
         focus_duration_min=chip_duration_min(slot_answers.get("energy.focus_duration")),
-        break_pattern=_first(_chip_values(slot_answers.get("energy.break_pattern"))),
-        weekly_energy=_first(_chip_values(slot_answers.get("energy.weekly_drain"))),
+        break_pattern=sv.first_chip(slot_answers.get("energy.break_pattern")),
+        weekly_energy=sv.first_chip(slot_answers.get("energy.weekly_drain")),
     )
 
 
@@ -444,8 +390,8 @@ def is_slot_needed(slot_key: str, slot_answers: Mapping[str, Any]) -> bool:
 
     FSM(`interview._next_required_slot`)과 `unresolved_slots` 판정이 **같은 술어**를 써야
     한다 — 한쪽만 건너뛰면 묻지도 않은 슬롯이 영영 미해결로 남아 인터뷰가 끝나지 않는다.
-    직접 부르지 말고 `open_required_keys` 를 쓰라 — 이 술어와 `is_filled_answer` 를
-    **같이** 적용해야 판정이 갈리지 않는다(아래 함수 주석 참고).
+    직접 부르지 말고 `open_required_keys`·`unresolved_required_keys` 를 쓰라 — 이 술어와
+    값 판정을 **같이** 적용해야 판정이 갈리지 않는다(아래 함수 주석 참고).
     """
     if slot_key == "goals.weekly_time":
         return derived_weekly_hours(slot_answers) is None
@@ -453,26 +399,67 @@ def is_slot_needed(slot_key: str, slot_answers: Mapping[str, Any]) -> bool:
 
 
 def open_required_keys(required_keys: Sequence[str], slot_answers: Mapping[str, Any]) -> list[str]:
-    """아직 **열려 있는** 필수 슬롯 키 — 순서 보존. "미해결 필수 슬롯" 의 단일 정의.
+    """아직 **열려 있는**(다시 물어야 하는) 필수 슬롯 키 — 순서 보존.
 
-    열려 있다 = 물어야 하고(`is_slot_needed`) 아직 안 채워졌다(`is_filled_answer`).
-    이 술어를 쓰는 곳이 셋인데, 셋이 같은 값을 봐야 한다:
+    열려 있다 = 물어야 하고(`is_slot_needed`) 아직 닫히지 않았다(`slot_value.is_settled`).
+    스킵은 닫힌 슬롯이다 — 다시 물으면 같은 질문이 끝없이 반복된다(#79). 쓰는 곳 둘이 같은
+    값을 봐야 한다:
 
     - `interview._next_required_slot` — 다음에 물을 슬롯 (없으면 FSM 완료)
-    - `build_outcome`/`build_ultimate_outcome` 의 `unresolved_slots` — First Plan 보완 분기
     - `api/routes/interview._remaining_required` — FE 명료성 지표(`ambiguityScore`)
 
-    셋이 손으로 각자 조립하다 실제로 갈렸다: FE 지표만 `is_slot_needed` 를 빠뜨려,
+    둘이 손으로 각자 조립하다 실제로 갈렸다: FE 지표만 `is_slot_needed` 를 빠뜨려,
     `goals.weekly_time` 이 길이×빈도로 **유도돼 묻지 않은** 세션에서 영원히 1로 남았다.
-    FSM 은 `completed` 로 끝나고 `unresolved_slots` 는 비어 있는데 진행바만 17/18 에
-    멈춰, 도입부가 선언한 "완료 = 남은 필수 슬롯 0 = 명료성 100%" 불변식이 깨졌다.
-    한 함수로 모아 다음 유도 슬롯이 생겨도 세 곳이 같이 움직이게 한다.
+    FSM 은 `completed` 로 끝났는데 진행바만 17/18 에 멈췄다.
+
+    ⚠️ outcome 의 `unresolved_slots` 는 **다른 질문**이다 — `unresolved_required_keys`.
     """
     return [
         k
         for k in required_keys
-        if is_slot_needed(k, slot_answers) and not is_filled_answer(slot_answers.get(k))
+        if is_slot_needed(k, slot_answers) and not sv.is_settled(slot_answers.get(k))
     ]
+
+
+def unresolved_required_keys(
+    required_keys: Sequence[str], slot_answers: Mapping[str, Any]
+) -> list[str]:
+    """사용자가 **값을 주지 않은** 필수 슬롯 키 — outcome 의 `unresolved_slots`, 순서 보존.
+
+    아직 안 물은 슬롯 + **스킵으로 닫힌 슬롯**이다(`slot_value.has_answer`). 둘 다 outcome 이
+    기본값으로 채우는 칸이라 `unresolved_slots`("default 처리된 필수 슬롯")에 들어가야 한다 —
+    스킵을 빼면 `profile_memory` 가 그 기본값을 사용자의 답으로 영속하고, 재인터뷰가 그 칸을
+    다시 묻지 않았다(#499). 유도 슬롯(`is_slot_needed` 가 False)은 값이 계산되므로 넣지 않는다.
+
+    `open_required_keys`(다시 물을 슬롯)와 일부러 다르다: 스킵한 슬롯은 다시 묻지 않지만
+    사용자의 답도 아니다. 그래서 정상 종료(`completed`)여도 이 목록이 비지 않을 수 있다.
+    """
+    return [
+        k
+        for k in required_keys
+        if is_slot_needed(k, slot_answers) and not sv.has_answer(slot_answers.get(k))
+    ]
+
+
+def resolved_heaviest(slot_answers: Mapping[str, Any]) -> str | None:
+    """이번 계획이 집중할 목표 제목 — 고른 heaviest, 못 골랐으면(스킵) **첫 목표**.
+
+    못 고른 경우를 첫 목표로 읽는 건 계획 쪽 규칙과 같은 대상이다(`first_plan_adapter` —
+    is_heaviest 가 없으면 첫 목표). 그래야 목표별 답(마감·세션 길이·빈도)이 그 목표에 붙는다.
+    대체는 **읽을 때만** 한다 — 저장은 스킵 그대로라 `unresolved_slots` 에 heaviest 가 남는다
+    (시스템이 고른 값은 사용자의 답이 아니다, #499). 한 번도 안 물은 경우(조기 종료)는
+    대체하지 않는다 — 그건 고르지 못한 게 아니라 묻지 않은 것이다.
+
+    목표 기록(`_build_goals`)·확인 카드(`interview._summary_variables`)·목표별 질문의 대상
+    (`interview._heaviest_goal_hint`)이 이 함수 하나를 읽는다.
+    """
+    value = slot_answers.get("goals.heaviest")
+    picked = sv.first_chip(value) or next(iter(sv.items(value)), None)
+    if picked:
+        return picked
+    if isinstance(sv.parse(value), sv.Skipped):
+        return next(iter(sv.items(slot_answers.get("goals.list"))), None)
+    return None
 
 
 def _chip_hours(value: Mapping[str, Any] | None) -> int | None:
@@ -503,11 +490,11 @@ def chip_duration_min(value: Mapping[str, Any] | None) -> int | None:
 
     숫자 뒤 '시'(간)면 ×60, '분'이면 그대로 누적. 예: '1시간 30분' → 90, '2시간' → 120.
     """
-    chips = _chip_values(value)
-    if not chips:
+    first = sv.first_chip(value)
+    if first is None:
         return None
     total, num = 0, ""
-    for ch in chips[0]:
+    for ch in first:
         if ch.isdigit():
             num += ch
         elif ch == "시" and num:  # '시간'
@@ -525,10 +512,9 @@ def _chip_frequency(value: Mapping[str, Any] | None) -> int | None:
     '매일'은 7로, '주 N회'는 N으로 환원한다. 숫자도 '매일'도 아니면(몰아서·상관없음) None →
     볼륨(weekly_hours) 기반 세션 수 산정으로 폴백한다.
     """
-    chips = _chip_values(value)
-    if not chips:
+    first = sv.first_chip(value)
+    if first is None:
         return None
-    first = chips[0]
     if "매일" in first:
         return 7
     digits = "".join(c for c in first if c.isdigit())

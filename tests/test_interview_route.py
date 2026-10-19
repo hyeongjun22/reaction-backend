@@ -1118,6 +1118,66 @@ def test_answer_with_the_current_client_turn_is_accepted(
 
 
 @pytest.mark.parametrize(
+    "value",
+    [
+        {"type": "pending", "attempts": 0},
+        {"type": "skip", "reason": "declined"},
+        {"type": "spec", "items": []},
+        {"type": "chip", "values": "3학년"},  # 칩인데 목록이 아니다
+        {"note": "모양 없음"},
+    ],
+)
+def test_answer_value_must_be_a_user_answer_shape(
+    client: TestClient, fake_interview_repo: FakeInterviewRepo, monkeypatch: Any, value: Any
+) -> None:
+    """클라이언트는 칩·텍스트·구간 답만 보낼 수 있다 — 대기·스킵·자료 확정은 서버만 쓰는 표시다.
+
+    예전엔 `{"type": ...}` 이 붙은 dict 를 그대로 믿어, 클라이언트가 `pending` 으로 재질문 횟수를
+    되돌리거나 `skip` 으로 핵심 슬롯을 닫을 수 있었다.
+    """
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(aiClient, "run", _recording_stub(calls))
+    start = client.post("/interview/sessions").json()
+    sid = start["sessionId"]
+    calls.clear()
+
+    res = client.post(
+        f"/interview/sessions/{sid}/answers",
+        json={"slotKey": "identity.role", "value": value, "clientTurn": start["totalTurns"]},
+    )
+
+    assert res.status_code == 422
+    assert res.json()["code"] == "COMMON_VALIDATION_ERROR"
+    assert res.json()["field"] == "value"
+    assert "identity.role" not in fake_interview_repo._answers.get(UUID(sid), {})
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "3학년",
+        ["3학년"],
+        {"type": "chip", "values": ["3학년"]},
+        {"type": "text", "raw": "3학년"},
+    ],
+)
+def test_user_answer_shapes_are_still_accepted(
+    client: TestClient, monkeypatch: Any, value: Any
+) -> None:
+    """문자열·목록·칩/텍스트 dict 는 종전대로 받는다."""
+    monkeypatch.setattr(aiClient, "run", _stub())
+    start = client.post("/interview/sessions").json()
+
+    res = client.post(
+        f"/interview/sessions/{start['sessionId']}/answers",
+        json={"slotKey": "identity.role", "value": value, "clientTurn": start["totalTurns"]},
+    )
+
+    assert res.status_code == 200
+
+
+@pytest.mark.parametrize(
     ("kind", "slot_key"),
     [
         ("plan", "identity.nickname"),  # 어느 카탈로그에도 없는 키

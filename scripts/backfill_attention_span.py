@@ -68,6 +68,7 @@ from reaction_backend.db.models.behavioral_profile import BehavioralProfile
 from reaction_backend.db.models.interview_session import InterviewSession
 from reaction_backend.db.models.interview_slot_answer import InterviewSlotAnswer
 from reaction_backend.db.session import get_sessionmaker
+from reaction_backend.domain import slot_value as sv
 from reaction_backend.orchestrator.profile_memory import chunk_bucket
 from reaction_backend.schemas.common import now_kst
 from scripts.preview_attention_span_backfill import (
@@ -213,10 +214,10 @@ async def _repair_seeded_answers(session: AsyncSession, row: BackfillRow) -> int
     fixed = 0
     for answer in result.scalars():
         value = answer.value
-        chip = value.get("values", [None])[0] if isinstance(value, dict) else None
-        if chip is None or is_trusted_chip(str(chip)):
+        chip = sv.first_chip(value) if isinstance(value, dict) else None
+        if chip is None or is_trusted_chip(chip):
             continue  # 사용자가 고른 답 — 건드리지 않는다
-        answer.value = {"type": "chip", "values": [row.recovered_chip]}
+        answer.value = sv.dump(sv.ChipAnswer((row.recovered_chip,)))
         fixed += 1
     return fixed
 

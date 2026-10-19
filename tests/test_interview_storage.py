@@ -13,7 +13,21 @@ from typing import Any
 import pytest
 
 from reaction_backend.orchestrator import interview, interview_catalog
-from reaction_backend.orchestrator.interview import _SKIP_MARKER, _decide_storage, _pending
+from reaction_backend.orchestrator.interview import _decide_storage, _pending
+
+
+class _AnySkip:
+    """스킵이면 사유와 무관하게 같다 — 이 표는 '스킵으로 닫는가' 를 본다. 사유는
+    `test_interview_skip_semantics.test_skip_records_why` 가 고정한다."""
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, dict) and other.get("type") == "skip"
+
+    def __repr__(self) -> str:
+        return "<any skip>"
+
+
+_SKIP = _AnySkip()
 
 _TEXT = {"type": "text", "raw": "x"}  # 대표 자유서술 raw (내용은 normalized/clarity 로 제어)
 
@@ -61,7 +75,7 @@ _TEXT = {"type": "text", "raw": "x"}  # 대표 자유서술 raw (내용은 norma
             None,
             0.0,
             1,
-            (_SKIP_MARKER, True),
+            (_SKIP, True),
         ),
         # 제약 슬롯(chip) LLM 매핑 실패·비스킵·비핵심 → 스킵으로 진행(무루프).
         # ⚠️ 이건 `has_chip_options=False` 일 때의 표다 — 카탈로그에 고정 보기가 있는 칩 슬롯은
@@ -74,7 +88,7 @@ _TEXT = {"type": "text", "raw": "x"}  # 대표 자유서술 raw (내용은 norma
             None,
             0.1,
             1,
-            (_SKIP_MARKER, True),
+            (_SKIP, True),
         ),
         # 핵심(goals.list) 스킵 신호·상한 전 → 스킵 거부, 재질문(pending)
         ("goals.list", "text", {"type": "text", "raw": "없어"}, "", 0.1, 1, (_pending(1), False)),
@@ -107,7 +121,7 @@ _TEXT = {"type": "text", "raw": "x"}  # 대표 자유서술 raw (내용은 norma
             None,
             0.0,
             1,
-            (_SKIP_MARKER, True),
+            (_SKIP, True),
         ),
         # 공백뿐인 답도 빈 답이다
         (
@@ -117,7 +131,7 @@ _TEXT = {"type": "text", "raw": "x"}  # 대표 자유서술 raw (내용은 norma
             None,
             0.0,
             1,
-            (_SKIP_MARKER, True),
+            (_SKIP, True),
         ),
         # 빈 답에서 LLM 이 값을 '추출'했다 주장해도(has_real 경로) 믿지 않는다 —
         # 사용자는 아무것도 입력하지 않았으므로 스킵이 이긴다.
@@ -128,7 +142,7 @@ _TEXT = {"type": "text", "raw": "x"}  # 대표 자유서술 raw (내용은 norma
             "주 3회",
             0.9,
             1,
-            (_SKIP_MARKER, True),
+            (_SKIP, True),
         ),
         # 핵심 슬롯의 빈 답은 스킵 불가 — 상한 전에는 기존 재질문(pending) 경로 유지
         ("goals.list", "text", {"type": "text", "raw": ""}, None, 0.0, 1, (_pending(1), False)),
@@ -138,8 +152,8 @@ _TEXT = {"type": "text", "raw": "x"}  # 대표 자유서술 raw (내용은 norma
         # `and answer_text.strip()` 이 핵심 슬롯 분기의 유일한 탈출 조건이었을 때, 빈 답이면
         # attempts 가 아무리 커져도(3이든 30이든) 계속 _pending 만 돌려줘 인터뷰가 절대
         # 끝나지 않았다. 비핵심 슬롯이 상한에서 스킵으로 진행하는 것과 같은 탈출구가 필요하다.
-        ("goals.list", "text", {"type": "text", "raw": ""}, None, 0.0, 3, (_SKIP_MARKER, True)),
-        ("goals.list", "text", {"type": "text", "raw": "   "}, None, 0.0, 3, (_SKIP_MARKER, True)),
+        ("goals.list", "text", {"type": "text", "raw": ""}, None, 0.0, 3, (_SKIP, True)),
+        ("goals.list", "text", {"type": "text", "raw": "   "}, None, 0.0, 3, (_SKIP, True)),
         (
             "goals.heaviest",
             "select",
@@ -147,10 +161,10 @@ _TEXT = {"type": "text", "raw": "x"}  # 대표 자유서술 raw (내용은 norma
             None,
             0.0,
             3,
-            (_SKIP_MARKER, True),
+            (_SKIP, True),
         ),
         # 상한을 넘겨도(레이스 등으로 4가 들어와도) 여전히 스킵으로 진행 — 다시 갇히지 않는다
-        ("goals.list", "text", {"type": "text", "raw": ""}, None, 0.0, 4, (_SKIP_MARKER, True)),
+        ("goals.list", "text", {"type": "text", "raw": ""}, None, 0.0, 4, (_SKIP, True)),
         # 상한 도달 + 비지 않은 답은 기존 best-effort 그대로 (회귀 없음 확인)
         (
             "goals.list",
@@ -170,7 +184,7 @@ _TEXT = {"type": "text", "raw": "x"}  # 대표 자유서술 raw (내용은 norma
             "",
             0.1,
             3,
-            (_SKIP_MARKER, True),
+            (_SKIP, True),
         ),
         (
             "goals.heaviest",
@@ -179,7 +193,7 @@ _TEXT = {"type": "text", "raw": "x"}  # 대표 자유서술 raw (내용은 norma
             None,
             0.1,
             3,
-            (_SKIP_MARKER, True),
+            (_SKIP, True),
         ),
     ],
 )
@@ -256,7 +270,7 @@ def test_deadline_skip_is_not_treated_as_past() -> None:
     stored, filled = _decide_storage(
         "goals.deadlines", "date_picker", {"type": "text", "raw": ""}, None, 0.0, 1, _TODAY
     )
-    assert (stored, filled) == (_SKIP_MARKER, True)
+    assert (stored, filled) == (_SKIP, True)
 
 
 def test_past_date_in_other_slots_is_untouched() -> None:

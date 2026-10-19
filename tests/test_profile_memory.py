@@ -9,6 +9,7 @@ import asyncio
 from types import SimpleNamespace
 from typing import Any, cast
 
+import pytest
 from fastapi.testclient import TestClient
 
 from reaction_backend.orchestrator import profile_memory as pm
@@ -309,6 +310,41 @@ def test_early_finish_does_not_write_defaults_into_the_profile(monkeypatch: Any)
     )
 
     assert calls.get("behavioral") is None  # 쓸 칸이 없으면 행도 만들지 않는다
+    assert calls.get("interaction") is None
+    assert not (user.focus_mode_preferences or {})
+    assert user.tone_mode is None
+
+
+@pytest.mark.parametrize(
+    "skip",
+    [{"type": "text", "raw": ""}, {"type": "skip", "reason": "declined"}],
+    ids=["legacy", "new"],
+)
+def test_skipped_fields_do_not_write_defaults_into_the_profile(
+    monkeypatch: Any, skip: dict[str, Any]
+) -> None:
+    """⚠️ "없어요·모르겠어요" 로 **넘긴** 칸도 안 답한 칸이다 (#499).
+
+    위 테스트는 슬롯 행 자체가 없는 경우다. 여기는 스킵으로 **닫힌** 경우 — 예전엔 스킵이
+    '답함' 으로 읽혀 `unresolved_slots` 에서 빠졌고, outcome 이 채운 기본값(활동창 09~23시·
+    톤 '담백'·최소 단위 10분·휴식 수용)이 사용자의 답으로 프로필에 굳었다.
+    """
+    user = cast(Any, SimpleNamespace(id="u1", tone_mode=None, focus_mode_preferences=None))
+    calls = _persist_real_outcome(
+        monkeypatch,
+        user,
+        {
+            "identity.role": {"type": "chip", "values": ["3학년"]},
+            "time.peak_window": skip,
+            "time.activity_window": skip,
+            "recovery.tone": skip,
+            "recovery.rest_ok": skip,
+            "recovery.downscope_unit": skip,
+        },
+        "completed",
+    )
+
+    assert calls.get("behavioral") is None
     assert calls.get("interaction") is None
     assert not (user.focus_mode_preferences or {})
     assert user.tone_mode is None

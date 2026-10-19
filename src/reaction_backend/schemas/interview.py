@@ -349,7 +349,8 @@ class InterviewOutcome(CamelModel):
     availability: AvailabilityProfile  # 가용 시간
     preferences: PreferenceProfile  # 선호 방식
     horizon: str | None = None  # 파생: max(core_goals.deadline) "YYYY-MM-DD"
-    unresolved_slots: list[str] = Field(default_factory=list)  # default 처리된 필수 슬롯 키
+    # default 처리된 필수 슬롯 키 — 아직 안 물은 슬롯 + 스킵으로 닫힌 슬롯(#499).
+    unresolved_slots: list[str] = Field(default_factory=list)
 
     @field_validator("horizon", mode="before")
     @classmethod

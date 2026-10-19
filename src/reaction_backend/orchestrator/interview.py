@@ -48,6 +48,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from reaction_backend.agents import ultimate_summary_agent
+from reaction_backend.domain import slot_value as sv
 from reaction_backend.llm import aiClient
 from reaction_backend.orchestrator import datetime_parse, interview_adapter, ultimate_adapter
 from reaction_backend.orchestrator.interview_catalog import (
@@ -85,9 +86,12 @@ __all__ = [
 
 STORE_CLARITY_MIN = 0.4  # clarity 가 이 미만이면 답을 채우지 않고 같은 슬롯 재질문
 
-# 사용자가 '없음/모름/건너뛰기'를 밝힌 슬롯에 저장하는 스킵 마커(빈 text). build_outcome 은
-# 이를 값 없음(default)으로 읽고, FSM 은 '채워짐'으로 보아 다음 슬롯으로 진행 → 무한 재질문 방지.
-_SKIP_MARKER: dict[str, Any] = {"type": "text", "raw": ""}
+
+def _skip(reason: sv.SkipReason) -> dict[str, Any]:
+    """스킵 — FSM 은 '닫힘' 으로 보아 다음 슬롯으로 진행하고(무한 재질문 방지, #79), outcome 은
+    그 슬롯을 `unresolved_slots` 에 남긴다(사용자의 답이 아니다, #499). 사유는 기록용이다."""
+    return sv.dump(sv.Skipped(reason))
+
 
 _log = logging.getLogger(__name__)
 
@@ -127,26 +131,19 @@ _RETRY_OFF_CATALOG = "off_catalog"
 
 def _pending(attempts: int, reason: str | None = None) -> dict[str, Any]:
     """재질문 대기 마커 — 시도 횟수를 slot_answers 에 실어 턴 사이에 영속(스키마 변경 없이)."""
-    marker: dict[str, Any] = {"type": "pending", "attempts": attempts}
-    if reason:
-        marker["reason"] = reason
-    return marker
+    return sv.dump(sv.Pending(attempts, reason or None))
 
 
 def _pending_attempts(value: dict[str, Any] | None) -> int:
     """슬롯에 누적된 시도 횟수 (pending 마커면 그 값, 아니면 0)."""
-    if value and value.get("type") == "pending":
-        raw = value.get("attempts", 0)
-        return int(raw) if isinstance(raw, int) else 0
-    return 0
+    parsed = sv.parse(value)
+    return parsed.attempts if isinstance(parsed, sv.Pending) else 0
 
 
 def _pending_reason(value: dict[str, Any] | None) -> str | None:
     """pending 마커에 실린 재질문 사유 (없으면 None)."""
-    if value and value.get("type") == "pending":
-        raw = value.get("reason")
-        return raw if isinstance(raw, str) and raw else None
-    return None
+    parsed = sv.parse(value)
+    return parsed.reason if isinstance(parsed, sv.Pending) else None
 
 
 def _retry_hint(
@@ -247,11 +244,6 @@ def initial_state(*, session_id: UUID, user_id: UUID, kind: str = "plan") -> Int
 # ─────────────────────────────────────────────────────────────────────────────
 # Rule-based FSM helpers — 순수 함수 (LLM 호출 X). 흐름은 룰이 운전한다.
 # ─────────────────────────────────────────────────────────────────────────────
-
-
-def _is_filled(value: dict[str, Any] | None) -> bool:
-    """슬롯 값이 실질적으로 채워졌는지 (빈 dict/None/pending 마커 제외)."""
-    return interview_adapter.is_filled_answer(value)
 
 
 def _next_required_slot(state: InterviewState) -> str | None:
@@ -451,7 +443,7 @@ async def ask_question(state: InterviewState, config: RunnableConfig) -> Intervi
             "answered_context": _answered_context(state),
             "last_answer": _last_answer_text(state),
             "retry": retry,
-            "statement": _answer_text(state["slot_answers"].get("ultimate.statement")),
+            "statement": sv.display_text(state["slot_answers"].get("ultimate.statement")),
         }
     else:
         # ⚠️ **목표별 슬롯이 아니면 목표 이름을 아예 넘기지 않는다.**
@@ -626,8 +618,6 @@ async def validate_answer(state: InterviewState, config: RunnableConfig) -> Inte
     # 목표가 1개뿐이면 goals.heaviest 자동 채움 → 자명한 select 질문(직전 답 echo)을 건너뛴다.
     if filled_now and slot_key == "goals.list":
         _autofill_single_goal_heaviest(slot_answers)
-    if slot_key == "goals.heaviest":
-        _settle_unpicked_heaviest(slot_answers)
 
     # 같은 호출에서 함께 뽑힌 다른 슬롯들 — 게이트·정규화·과거마감 규칙은 그대로다.
     harvested = (
@@ -680,7 +670,7 @@ def _apply_harvested(
     open_set = set(open_slots)
     prefilled: list[str] = []
     for h in harvested:
-        if h.slot_key not in open_set or _is_filled(slot_answers.get(h.slot_key)):
+        if h.slot_key not in open_set or sv.is_settled(slot_answers.get(h.slot_key)):
             continue
         if h.confidence < HARVEST_MIN_CONFIDENCE:
             continue
@@ -724,7 +714,7 @@ def harvest_candidates(
         for k in catalog.required_keys
         if k != answered_slot
         and k not in catalog.harvest_exclude
-        and not _is_filled(state["slot_answers"].get(k))
+        and not sv.is_settled(state["slot_answers"].get(k))
     ]
     if not _per_goal_harvest_allowed(state["slot_answers"]):
         open_slots = [k for k in open_slots if k not in catalog.per_goal_slots]
@@ -898,9 +888,9 @@ def _normalize_for_store(slot_key: str, answer: dict[str, Any]) -> dict[str, Any
             and any(_SENTENCE_TAIL_RE.search(p) for p in parts)
         ):
             _log.info("goal_list_prose_not_split", extra={"parts": len(parts)})
-            return {**answer, "normalized": [raw.strip()]}
+            return sv.dump(sv.TextAnswer(raw, (raw.strip(),)))
         if parts:
-            return {**answer, "normalized": parts}
+            return sv.dump(sv.TextAnswer(raw, tuple(parts)))
     return answer
 
 
@@ -1037,7 +1027,7 @@ def _coerce_normalized(
     build_outcome 이 읽는 규약과 일치:
     - chip/select → {"type":"chip","values":[...]}
     - time_range  → {"type":"range","start":"HH:MM","end":"HH:MM"}
-    - date_picker → {"type":"text","raw":"YYYY-MM-DD"}  (goals.deadlines 는 _text_raw 로 읽음)
+    - date_picker → {"type":"text","raw":"YYYY-MM-DD"}  (goals.deadlines 는 slot_value.text 로 읽음)
     - text/미지정 → {"type":"text","raw":..., "normalized":[...]}
     """
     if norm is None:
@@ -1045,24 +1035,24 @@ def _coerce_normalized(
     if answer_type in {"chip", "select"}:
         vals = norm if isinstance(norm, list) else [norm]
         cleaned = _match_options(vals, slot=slot, options=options)
-        return {"type": "chip", "values": cleaned} if cleaned else None
+        return sv.dump(sv.ChipAnswer(tuple(cleaned))) if cleaned else None
     if answer_type == "time_range":
         if isinstance(norm, dict):
             start, end = norm.get("start"), norm.get("end")
             if isinstance(start, str) and start and isinstance(end, str) and end:
-                return {"type": "range", "start": start, "end": end}
+                return sv.dump(sv.RangeAnswer(start, end))
         return None
     if answer_type == "date_picker":
         if isinstance(norm, (dict, list)):
             return None
         s = str(norm).strip()
-        return {"type": "text", "raw": s} if s else None
+        return sv.dump(sv.TextAnswer(s)) if s else None
     # text 또는 answer_type 미지정 (graph/legacy) — 정리된 핵심값
     if isinstance(norm, list):
         items = [str(v).strip() for v in norm if str(v).strip()]
-        return {"type": "text", "raw": ", ".join(items), "normalized": items} if items else None
+        return sv.dump(sv.TextAnswer(", ".join(items), tuple(items))) if items else None
     s = str(norm).strip()
-    return {"type": "text", "raw": s} if s else None
+    return sv.dump(sv.TextAnswer(s)) if s else None
 
 
 # goals.list 항목 중 **목표가 아니라 직전 목표의 부연 설명**인 것의 강한 신호 (#232 백스톱).
@@ -1206,7 +1196,7 @@ def _decide_storage(
     if last_answer is None:
         return None, False  # 배치 그래프 등 답 미주입 턴
 
-    answer_text = _answer_text(last_answer)
+    answer_text = sv.display_text(last_answer)
     # 빈 답 = 명시적 '넘기기' — "없으면 넘겨도 돼요" 라고 물어 놓고 빈 답을 3회 재질문하던
     # 문제(실측: approach·materials 가 문구만 바뀐 같은 질문을 각 3번 반복). 빈 문자열은
     # `_looks_like_skip` 의 스킵 정규식에 안 걸리고, date_picker 같은 제약 타입만
@@ -1214,7 +1204,7 @@ def _decide_storage(
     # 이유: 빈 답에서 LLM 이 뭔가 '추출'했다 주장해도(has_real) 믿으면 안 된다 —
     # 사용자는 아무것도 입력하지 않았다. 핵심 슬롯은 기존 재질문 경로로 내려보낸다.
     if not answer_text.strip() and slot_key not in critical_slots:
-        return _SKIP_MARKER, True
+        return _skip("empty"), True
     llm_skip = isinstance(normalized, str) and not normalized.strip()
 
     if llm_skip:
@@ -1246,10 +1236,10 @@ def _decide_storage(
         # **빈 답이어도 여기서 멈추면 안 된다** — attempts>=MAX 인데 answer_text 가
         # 계속 비어 있으면(#79 회귀: 핵심 슬롯에 빈 답만 반복) `and answer_text.strip()`
         # 가 거짓이라 아래로 안 빠지고 매번 `_pending` 만 돌려줘 시도 횟수가 아무리
-        # 늘어도 절대 끝나지 않았다. 비핵심 슬롯(:791)이 상한에서 `_SKIP_MARKER` 로
-        # 스킵하는 것과 같은 탈출구를 핵심 슬롯에도 열어준다 — `is_filled_answer` 가
-        # 스킵 마커를 '충족'으로 읽고, `build_outcome` 이 `unresolved_slots` 에 기록해
-        # First Plan 이 보완 질문으로 이어받는다(핵심 슬롯도 이미 이 경로로 설계돼 있다).
+        # 늘어도 절대 끝나지 않았다. 비핵심 슬롯이 상한에서 스킵으로 닫는 것과 같은 탈출구를
+        # 핵심 슬롯에도 열어준다 — `slot_value.is_settled` 가 스킵을 '닫힘' 으로 읽어 다시
+        # 묻지 않고, `build_outcome` 은 그 슬롯을 `unresolved_slots` 에 기록해(#499) First Plan
+        # 이 보완 질문으로 이어받는다.
         #
         # '모르겠어요'·'딱히 없어요' 같은 **스킵 의사는 채택하지 않는다** — 세 번 솔직하게
         # 답한 학생에게 '음 잘 모르겠어요' 라는 Focus 목표가 생기고, 그 이름으로 목표별
@@ -1257,13 +1247,16 @@ def _decide_storage(
         # outcome 은 자리표시자 목표를 쓰고, 그 자리표시자는 영속되지 않는다(#88).
         #
         # 보기 중에서 골라야 하는 핵심 슬롯(`goals.heaviest`)은 자유 입력을 채택하지 않는다 —
-        # 보기에 없는 이름이 목표로 덧붙는다(`_build_goals`). 스킵으로 닫고, 호출부가
-        # `_settle_unpicked_heaviest` 로 첫 목표를 정한다.
+        # 보기에 없는 이름이 목표로 덧붙는다(`_build_goals`). 스킵으로 닫고, 계획이 집중할
+        # 목표는 읽는 쪽(`interview_adapter.resolved_heaviest`)이 첫 목표로 대체한다.
         if attempts >= MAX_SLOT_ATTEMPTS:
-            picks_from_options = answer_type in {"chip", "select"} and bool(options)
-            if answer_text.strip() and not _looks_like_skip(answer_text) and not picks_from_options:
-                return {"type": "text", "raw": answer_text.strip()}, True
-            return _SKIP_MARKER, True
+            if not answer_text.strip():
+                return _skip("empty"), True
+            if _looks_like_skip(answer_text):
+                return _skip("declined"), True
+            if answer_type in {"chip", "select"} and options:
+                return _skip("off_options"), True
+            return sv.dump(sv.TextAnswer(answer_text.strip())), True
         return _pending(attempts), False
     # 보기가 정해진 칩 슬롯에 보기로 맞출 수 없는 답이 왔다 — '없음' 으로 닫지 않는다.
     #
@@ -1279,11 +1272,19 @@ def _decide_storage(
         and answer_text.strip()
         and not _looks_like_skip(answer_text)
     ):
+        # 상한까지 보기 밖이면 스킵으로 닫는다 — 예전엔 칩 슬롯에 텍스트로 넣어, 읽으면 기본값인데
+        # 판정은 '답함' 이라 그 기본값이 사용자의 답으로 프로필에 굳었다(#499 와 같은 구멍).
         if attempts >= MAX_SLOT_ATTEMPTS:
-            return {"type": "text", "raw": answer_text.strip()}, True
+            return _skip("off_options"), True
         return _pending(attempts, _RETRY_OFF_CATALOG), False
-    if llm_skip or is_constrained or _looks_like_skip(answer_text) or attempts >= MAX_SLOT_ATTEMPTS:
-        return _SKIP_MARKER, True
+    if _looks_like_skip(answer_text):
+        return _skip("declined"), True
+    if llm_skip:
+        return _skip("llm"), True
+    if is_constrained:
+        return _skip("unreadable"), True
+    if attempts >= MAX_SLOT_ATTEMPTS:
+        return _skip("gave_up"), True
     return _pending(attempts), False
 
 
@@ -1292,21 +1293,7 @@ def _has_answer_text(state: InterviewState) -> bool:
 
 
 def _last_answer_text(state: InterviewState) -> str:
-    return _answer_text(state["last_answer"])
-
-
-def _answer_text(answer: dict[str, Any] | None) -> str:
-    """답 value(dict) → 사람이 읽는 문자열 (프롬프트·스킵 감지용)."""
-    if not answer:
-        return ""
-    if answer.get("type") == "text":
-        return str(answer.get("raw", ""))
-    if answer.get("type") == "chip":
-        values = answer.get("values") or []
-        return ", ".join(str(v) for v in values)
-    if answer.get("type") == "range":
-        return f"{answer.get('start', '')}~{answer.get('end', '')}"
-    return ""
+    return sv.display_text(state["last_answer"])
 
 
 # 러닝 요약의 값 하나당 최대 글자 수 — 붙여넣은 자료 원문(최대 2만 자)이 뒤이은 질문
@@ -1326,9 +1313,9 @@ def _answered_context(state: InterviewState) -> str:
     parts: list[str] = []
     for slot_key, tag in CATALOGS[state["kind"]].context_labels.items():
         value = answers.get(slot_key)
-        if not _is_filled(value):
+        if not sv.has_answer(value):
             continue
-        text = _answer_text(value).strip()
+        text = sv.display_text(value).strip()
         if len(text) > _CONTEXT_VALUE_MAX:
             text = text[:_CONTEXT_VALUE_MAX].rstrip() + "…"
         if text:
@@ -1337,13 +1324,13 @@ def _answered_context(state: InterviewState) -> str:
 
 
 def _heaviest_goal_hint(state: InterviewState) -> str:
-    heaviest = state["slot_answers"].get("goals.heaviest")
-    text = _slot_text(heaviest) or _slot_first_chip(heaviest)
-    if text:
-        return text
-    goals = state["slot_answers"].get("goals.list")
-    items = _slot_items(goals)
-    return items[0] if items else "당신의 목표"
+    """목표별 질문이 가리킬 목표 — 계획이 집중할 목표(`resolved_heaviest`), 아직 모르면 첫 목표."""
+    answers = state["slot_answers"]
+    return (
+        interview_adapter.resolved_heaviest(answers)
+        or next(iter(sv.items(answers.get("goals.list"))), None)
+        or "당신의 목표"
+    )
 
 
 _NOT_SET = "아직 정하지 않음"
@@ -1357,28 +1344,22 @@ def _summary_variables(state: InterviewState) -> dict[str, str]:
     "아직 정하지 않음"). 미입력 항목을 지어내지 않게 프롬프트가 이 default 를 그대로 노출.
     """
     answers = state["slot_answers"]
-    role = _slot_first_chip(answers.get("identity.role")) or "미상"
-    season = _slot_first_chip(answers.get("identity.season")) or ""
-    goals = ", ".join(_slot_items(answers.get("goals.list"))) or _NOT_SET
-    heaviest = (
-        _slot_text(answers.get("goals.heaviest"))
-        or _slot_first_chip(answers.get("goals.heaviest"))
-        or _NOT_SET
-    )
-    deadlines = _slot_text(answers.get("goals.deadlines")) or _NOT_SET
-    success_image = _slot_text(answers.get("goals.success_image")) or _NOT_SET
-    window = answers.get("time.activity_window")
-    time_window = (
-        f"{window.get('start')}~{window.get('end')}"
-        if window and window.get("type") == "range"
-        else _NOT_SET
-    )
-    peak = ", ".join(_slot_chips(answers.get("time.peak_window"))) or _NOT_SET
+    role = sv.first_chip(answers.get("identity.role")) or "미상"
+    season = sv.first_chip(answers.get("identity.season")) or ""
+    goals = ", ".join(sv.items(answers.get("goals.list"))) or _NOT_SET
+    # 계획이 집중할 목표와 **같은 값** — 못 골랐으면(스킵) 첫 목표다(`resolved_heaviest`).
+    # 확인 카드는 [이대로 진행] 을 누르는 화면이라, 계획이 다룰 목표를 그대로 보여 줘야 한다.
+    heaviest = interview_adapter.resolved_heaviest(answers) or _NOT_SET
+    deadlines = sv.text(answers.get("goals.deadlines")) or _NOT_SET
+    success_image = sv.text(answers.get("goals.success_image")) or _NOT_SET
+    window = sv.time_range(answers.get("time.activity_window"))
+    time_window = f"{window[0]}~{window[1]}" if window else _NOT_SET
+    peak = ", ".join(sv.chips(answers.get("time.peak_window"))) or _NOT_SET
     # 미답이면 기본값('담백')이 아니라 _NOT_SET — 요약 프롬프트가 "말하지 않은 사실을 지어내지
     # 말 것" 규칙대로 생략하게 한다. outcome 의 안전 기본값과 요약 문구는 다른 문제다.
-    tone = _slot_first_chip(answers.get("recovery.tone")) or _NOT_SET
-    rest_ok = _slot_first_chip(answers.get("recovery.rest_ok")) or _NOT_SET
-    downscope_unit = _slot_first_chip(answers.get("recovery.downscope_unit")) or _NOT_SET
+    tone = sv.first_chip(answers.get("recovery.tone")) or _NOT_SET
+    rest_ok = sv.first_chip(answers.get("recovery.rest_ok")) or _NOT_SET
+    downscope_unit = sv.first_chip(answers.get("recovery.downscope_unit")) or _NOT_SET
     identity = f"{role} {season}".strip()
     # 계산된 주당 총량 — 사용자에게 **곱셈 결과를 되돌려준다**. '한 번에 2시간 · 매일' 이
     # 주 14시간이라는 걸 확인 카드에서 보고 조정할 수 있게(그동안은 셋을 따로 묻고, 어긋나면
@@ -1388,13 +1369,13 @@ def _summary_variables(state: InterviewState) -> dict[str, str]:
     # 예전엔 여기만 유도값을 먼저 읽어서, 주당 시간을 직접 답한 사용자에게 카드가 "약 주
     # 3.5시간" 을 보여 주고 계획은 답한 주 2시간으로 만들어졌다(실측). 확인 카드는 사용자가
     # [이대로 진행] 을 누르는 화면이라, 거기 적힌 숫자가 곧 계획의 숫자여야 한다.
-    answered_weekly = _slot_first_chip(answers.get("goals.weekly_time"))
+    answered_weekly = sv.first_chip(answers.get("goals.weekly_time"))
     derived = interview_adapter.derived_weekly_hours(answers)
     if answered_weekly:
         weekly_load = answered_weekly
     elif derived:
-        length = _slot_first_chip(answers.get("goals.session_length")) or "?"
-        freq = _slot_first_chip(answers.get("goals.frequency")) or "?"
+        length = sv.first_chip(answers.get("goals.session_length")) or "?"
+        freq = sv.first_chip(answers.get("goals.frequency")) or "?"
         weekly_load = f"약 주 {derived:g}시간 (한 번 {length} × {freq})"
     else:
         weekly_load = _NOT_SET
@@ -1413,35 +1394,6 @@ def _summary_variables(state: InterviewState) -> dict[str, str]:
     }
 
 
-def _slot_chips(value: dict[str, Any] | None) -> list[str]:
-    if not value or value.get("type") != "chip":
-        return []
-    raw = value.get("values") or []
-    return [str(v) for v in raw] if isinstance(raw, list) else []
-
-
-def _slot_first_chip(value: dict[str, Any] | None) -> str | None:
-    chips = _slot_chips(value)
-    return chips[0] if chips else None
-
-
-def _slot_text(value: dict[str, Any] | None) -> str | None:
-    if not value or value.get("type") != "text":
-        return None
-    raw = value.get("raw")
-    return str(raw) if isinstance(raw, str) and raw.strip() else None
-
-
-def _slot_items(value: dict[str, Any] | None) -> list[str]:
-    if not value or value.get("type") != "text":
-        return []
-    norm = value.get("normalized")
-    if isinstance(norm, list):
-        return [str(v) for v in norm if str(v).strip()]
-    raw = value.get("raw")
-    return [str(raw)] if isinstance(raw, str) and raw.strip() else []
-
-
 def _per_goal_harvest_allowed(slot_answers: dict[str, dict[str, Any] | None]) -> bool:
     """목표별 슬롯(`interview_catalog.PLAN_CATALOG.per_goal_slots`)을 하베스팅해도 되는가 —
 
@@ -1452,24 +1404,9 @@ def _per_goal_harvest_allowed(slot_answers: dict[str, dict[str, Any] | None]) ->
     모르면(goals.list 미답) 속성이 어느 목표 것인지 알 수 없어, 오채움이 재질문보다 나쁘다는
     이 노드의 원칙대로 정식 질문에 맡긴다.
     """
-    if _is_filled(slot_answers.get("goals.heaviest")):
+    if sv.is_settled(slot_answers.get("goals.heaviest")):
         return True
-    return len(_slot_items(slot_answers.get("goals.list"))) == 1
-
-
-def _settle_unpicked_heaviest(slot_answers: dict[str, dict[str, Any] | None]) -> None:
-    """heaviest 가 고르지 못한 채(스킵) 닫혔으면 **첫 목표**로 정한다.
-
-    계획 쪽 규칙과 같은 대상이다 — `first_plan_adapter` 는 is_heaviest 가 없으면 첫 목표를
-    다룬다. 그런데 heaviest 를 비워 두면 `_build_goals` 가 목표별 답(마감·세션 길이·빈도…)을
-    어느 목표에도 붙이지 않아, 계획은 첫 목표를 다루면서 그 답들을 잃는다. 확인 카드가 이
-    목표를 보여 주므로 사용자는 계획 전에 볼 수 있다. 목표가 없으면 그대로 둔다.
-    """
-    if slot_answers.get("goals.heaviest") != _SKIP_MARKER:
-        return
-    items = _slot_items(slot_answers.get("goals.list"))
-    if items:
-        slot_answers["goals.heaviest"] = {"type": "chip", "values": [items[0]]}
+    return len(sv.items(slot_answers.get("goals.list"))) == 1
 
 
 def _autofill_single_goal_heaviest(slot_answers: dict[str, dict[str, Any] | None]) -> None:
@@ -1479,11 +1416,11 @@ def _autofill_single_goal_heaviest(slot_answers: dict[str, dict[str, Any] | None
     보기가 직전 답(goals.list)을 그대로 반복(echo)한다 → 그 하나를 heaviest 로 자동 확정한다.
     사용자가 이미 답한 경우(재조립 등)엔 건드리지 않는다.
     """
-    if _is_filled(slot_answers.get("goals.heaviest")):
+    if sv.is_settled(slot_answers.get("goals.heaviest")):
         return
-    items = _slot_items(slot_answers.get("goals.list"))
+    items = sv.items(slot_answers.get("goals.list"))
     if len(items) == 1:
-        slot_answers["goals.heaviest"] = {"type": "chip", "values": [items[0]]}
+        slot_answers["goals.heaviest"] = sv.dump(sv.ChipAnswer((items[0],)))
 
 
 def build_interview_graph() -> CompiledStateGraph[
