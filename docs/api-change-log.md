@@ -7,6 +7,40 @@
 
 ---
 
+## v2.37 — 2026-10-20 (교재 카드 — 토익 교재를 고르면 계획이 그 책의 단원 순서로 짜인다, ADR-0011)
+
+**추가 + 버그 수정 — 자료 검색 파이프라인 · 마일스톤 · 계획 생성.** 응답 필드는 추가만, 마이그레이션 없음.
+
+### 무엇이 잘못됐었나
+
+- 해커스 교재를 확정해도 계획이 책을 따르지 않았다 — 목차를 API 로 못 얻어 분해가 받는 건 쪽수뿐이었고
+  (기준선: 책 단원을 가리키는 세션 0/16), 첫 계획 이후 회차는 자료를 아예 보지 않았다.
+- `study-method` 응답의 `materialMix` 가 늘 기본값 `"both"` 였다 — 응답을 만들며 그 필드를 빠뜨려,
+  에이전트가 `"book"`·`"video"` 를 골라도 클라이언트에 닿지 않았다.
+
+### 이제
+
+- `POST /plans/materials/study-method` 응답에 `curatedBooks[]` 추가 — 목표가 토익이면 교재 카드 추천
+  (`{id, title, publisher, role, structure, unitCount, pageCount, reason, recommended}`). 아니면 빈 배열.
+  `materialMix` 는 에이전트가 고른 값 그대로 온다.
+- `POST /plans/materials/curriculum-confirm` 신설 — `{ bookIds[1..4], interviewSessionId? }` → 카드로
+  `goals.materials` 를 확정한다(항목은 서버 카드로 만든다). 응답 `{ goalTitle, bookIds, notice }`.
+  모르는 id 422 `COMMON_VALIDATION_ERROR`(`field: "bookIds"`), 인터뷰 없으면 422.
+- 인터뷰 outcome 의 목표(`coreGoals[]`)에 `curriculum: string[]` 추가 — 카드로 확정한 책 id(heaviest 만).
+- 카드가 확정된 목표는 `POST /plans/milestones` 가 LLM 대신 책 단원 단계를 돌려준다(`aiSource="rule"`,
+  제목에 단원 범위). 이미 확정·영속된 뼈대가 있으면 예전처럼 그걸 돌려준다(`"saved"`).
+- 같은 목표의 `POST /plans/generate` 는 세션 제목이 책 단원을 가리킨다("700+ LC DAY 03 · 사람 중심
+  사진 + 700+ RC DAY 03 · 동사 형태·수일치"). 시간이 모자라면 단원을 빼지 않고 `warnings` 에 세션당
+  필요한 시간을 알린다. 마일스톤을 추가·삭제했으면 예전 LLM 분해로 돌아간다.
+
+### FE 가 할 일
+
+- 자료 찾기 화면에 추천 교재 카드(체크박스 + 확정 버튼) — 이 변경과 함께 들어갔다.
+- (후속) 카드 계획의 `aiSource` 는 지금 `"llm"` 으로 온다. "규칙 기반 = 오프라인 모드" 안내와 겹치지
+  않게 별도 값·배지가 필요하다(ADR-0011 다음 항목).
+
+---
+
 ## v2.36 — 2026-10-19 (스킵은 답이 아니다 — `unresolvedSlots` 에 스킵 포함 · 답 `value` 모양 제한)
 
 **의미 변경 + 에러 응답 추가 — 인터뷰 outcome · `POST /interview/sessions/{id}/answers`.** 응답 스키마

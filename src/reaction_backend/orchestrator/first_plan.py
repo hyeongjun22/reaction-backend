@@ -39,7 +39,12 @@ from langgraph.graph.state import CompiledStateGraph
 from reaction_backend.config import get_settings
 from reaction_backend.integrations.google_calendar import freebusy
 from reaction_backend.llm import aiClient
-from reaction_backend.orchestrator import escalation, first_plan_adapter, materials_resolver
+from reaction_backend.orchestrator import (
+    curriculum_plan,
+    escalation,
+    first_plan_adapter,
+    materials_resolver,
+)
 from reaction_backend.orchestrator.goal_structuring import (
     BusyBlock,
     TimeInterval,
@@ -133,6 +138,11 @@ class FirstPlanState(TypedDict):
     goal_plan: GoalDecomposition | None
     # 마감까지 커버하려고 덧붙인 '이어가기' 회차 수 (0이면 LLM 분해만으로 충분했다는 뜻).
     coverage_extended: int
+    # 교재 카드로 짠 계획인가(`curriculum_plan`) — 분해 LLM 을 건너뛰었으므로 검토 LLM 도 돌리지
+    # 않는다(같은 입력이면 같은 결과라 반려→재분해가 아무것도 바꾸지 못한다).
+    curriculum_plan: bool
+    # 교재 단원이 이번 주기 세션 길이에 다 안 들어갈 때의 고지 — 단원은 버리지 않는다.
+    curriculum_notice: str | None
     # 세션에서 걷어낸 '외부 대기' 단계 제목들 — warnings 고지용 (#225).
     waiting_dropped: list[str]
     # **마지막** 분해가 룰 폴백이었으면 그 사유(`RunResult.reason`), LLM 이 만들었으면 None.
@@ -180,6 +190,8 @@ def initial_state(
         planning_context={},
         goal_plan=None,
         coverage_extended=0,
+        curriculum_plan=False,
+        curriculum_notice=None,
         waiting_dropped=[],
         decompose_fallback_reason=None,
         scheduled_blocks=[],
@@ -512,12 +524,67 @@ def _cycle_milestones(state: FirstPlanState) -> list[MilestoneDraft]:
     )
 
 
+def _curriculum_decomposition(state: FirstPlanState) -> curriculum_plan.CurriculumPlan | None:
+    """목표에 교재 카드가 확정돼 있으면 그 단원으로 이번 주기 세션을 짠다 — 아니면 None.
+
+    세션 수는 '이어가기' 보충(`extend_action_plan_to_horizon`)이 채우려는 개수와 **같은 식**
+    이다 — LLM 경로에서 보충까지 거친 계획과 분량이 같아야 카드 유무로 계획 크기가 달라지지
+    않는다. 마일스톤을 확정하지 않고 바로 세우는 계획이면 카드 단계를 그 자리에서 만들어 창을
+    고른다(그 목록은 상태에 남기지 않는다 — '확정하신 중간 목표' 고지가 사용자가 확정한 적 없는
+    것을 확정했다고 말하게 된다).
+    """
+    # `.get` — 분해 노드만 떼어 부르는 호출(톤 배선 테스트 등)은 outcome 없이 들어온다. LLM 경로도
+    # outcome 을 분해 결과가 있을 때만 읽는다 — 카드 판정이 그 앞에서 KeyError 를 내면 안 된다.
+    outcome = state.get("outcome")
+    if outcome is None:
+        return None
+    heaviest = first_plan_adapter.heaviest_goal_or_none(outcome)
+    books = curriculum_plan.books_for(heaviest)
+    if heaviest is None or not books:
+        return None
+    target_day = date.fromisoformat(state["target_date"])
+    max_weeks = state["max_plan_weeks"]
+    all_milestones = state.get("milestones") or curriculum_plan.milestones(
+        books,
+        full_weeks=first_plan_adapter.full_horizon_weeks(target_day, outcome.horizon),
+        cycle_weeks=max_weeks,
+    )
+    n_sessions = first_plan_adapter.cadence_session_cap(
+        outcome, state["density"], target_date=target_day, max_weeks=max_weeks
+    ) or first_plan_adapter.horizon_session_target(
+        outcome, state["density"], target_date=target_day, max_weeks=max_weeks
+    )
+    return curriculum_plan.decomposition(
+        goal_title=heaviest.title,
+        books=books,
+        all_milestones=all_milestones,
+        window=_cycle_milestones({**state, "milestones": list(all_milestones)}),
+        n_sessions=n_sessions,
+        session_minutes=first_plan_adapter.session_min_for(outcome),
+    )
+
+
 async def decompose_goal(state: FirstPlanState, config: RunnableConfig) -> FirstPlanState:
     """PLANNING (LLM ②③) — goal_node 트리 + action_item 분해.
 
     replan 재진입 시엔 직전 리뷰 피드백(`_replan_feedback`)을 프롬프트에 실어, 재분해가
     같은 결과를 반복하지 않고 검토 지적을 반영하도록 닫힌 루프를 만든다.
+
+    교재 카드가 확정된 목표는 LLM 대신 `_curriculum_decomposition` 이 책 단원 순서로 짠다.
+    짝이 안 맞으면(사용자가 마일스톤을 추가·삭제했다) 아래 LLM 경로로 그대로 내려간다.
     """
+    curriculum = _curriculum_decomposition(state)
+    if curriculum is not None:
+        return {
+            **state,
+            "goal_plan": curriculum.decomposition,
+            "curriculum_plan": True,
+            "curriculum_notice": curriculum.notice,
+            "out_of_cycle_dropped": [],
+            "coverage_extended": 0,
+            "waiting_dropped": [],
+            "decompose_fallback_reason": None,
+        }
     ctx = state["planning_context"]
     prompt_vars = ctx.get("prompt_vars", {}) if isinstance(ctx, dict) else {}
     settings = get_settings()
@@ -982,6 +1049,10 @@ async def schedule_blocks(state: FirstPlanState, config: RunnableConfig) -> Firs
     )
     if damped:
         warnings = [damped, *warnings]
+    # 교재 단원이 세션 길이에 다 안 들어간다 — 분량을 말없이 늘리거나 단원을 빼지 않고 알린다.
+    curriculum_notice = state.get("curriculum_notice")
+    if curriculum_notice:
+        warnings = [curriculum_notice, *warnings]
     link_only = first_plan_adapter.materials_link_only_warning(
         outcome,
         fetched=bool(state.get("materials_fetched")),
@@ -1247,6 +1318,9 @@ def after_schedule(state: FirstPlanState) -> Literal["review", "done"]:
     검토를 건너뛰는 건 검토 폴백(`_rule_review`, 그대로 승인)과 같은 결과다 — HITL 이 최종 게이트.
     """
     if state.get("decompose_fallback_reason") in _RETRY_FUTILE_FALLBACKS:
+        return "done"
+    # 교재 카드 계획은 결정적이다 — 반려돼 다시 분해해도 같은 계획이 나온다.
+    if state.get("curriculum_plan"):
         return "done"
     if _past_review_deadline(state):
         return "done"

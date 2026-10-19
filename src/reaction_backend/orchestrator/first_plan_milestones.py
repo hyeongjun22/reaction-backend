@@ -10,15 +10,17 @@
 
 from __future__ import annotations
 
+from datetime import date
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from reaction_backend.config import get_settings
 from reaction_backend.llm import aiClient
-from reaction_backend.orchestrator import materials_resolver
+from reaction_backend.orchestrator import curriculum_plan, materials_resolver
 from reaction_backend.orchestrator.first_plan_adapter import (
     context_from_outcome,
+    full_horizon_weeks,
     heaviest_goal,
     heaviest_goal_or_none,
     restore_user_phrases_in_milestones,
@@ -26,6 +28,25 @@ from reaction_backend.orchestrator.first_plan_adapter import (
 from reaction_backend.schemas.common import now_kst
 from reaction_backend.schemas.interview import InterviewOutcome
 from reaction_backend.schemas.planning import MilestoneDraft, MilestonePlan
+
+
+def curriculum_milestones(
+    outcome: InterviewOutcome, *, cycle_weeks: int, target_date: date | None = None
+) -> list[MilestoneDraft] | None:
+    """목표에 교재 카드가 확정돼 있으면 그 책의 단원 단계를 마일스톤으로 — LLM 0회.
+
+    카드가 없으면 `None` — 호출자가 `generate_milestones`(LLM)로 간다. 라우트가 이걸 먼저
+    부르는 이유는 `aiSource` 를 정직하게 적기 위해서다: 카드 마일스톤은 폴백이 아니지만 LLM
+    산출물도 아니라 `"rule"` 이다(`generate_milestones` 의 `fell_back` 과 뜻이 다르다).
+    """
+    books = curriculum_plan.books_for(heaviest_goal_or_none(outcome))
+    if not books:
+        return None
+    return curriculum_plan.milestones(
+        books,
+        full_weeks=full_horizon_weeks(target_date or now_kst().date(), outcome.horizon),
+        cycle_weeks=cycle_weeks,
+    )
 
 
 def _rule_milestones(outcome: InterviewOutcome) -> MilestonePlan:

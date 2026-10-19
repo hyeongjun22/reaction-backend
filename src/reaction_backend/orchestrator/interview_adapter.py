@@ -119,6 +119,22 @@ def _materials_note(value: Mapping[str, Any] | None) -> str | None:
     return sv.text(value)
 
 
+def _curriculum_ids(value: Mapping[str, Any] | None) -> list[str]:
+    """`goals.materials` 확정본에서 **교재 카드**로 고른 책의 id — 순서 보존·중복 제거.
+
+    카드로 고른 책 항목엔 `catalog_id` 가 실린다(`materials_spec._spec_item_dict`). 알라딘
+    검색·붙여넣기로 확정한 자료엔 없으므로 빈 목록이 되고, 계획은 예전처럼 `materials_note`
+    텍스트로 만든다.
+    """
+    if not isinstance(sv.parse(value), sv.SpecAnswer):
+        return []
+    items = (value or {}).get("items")
+    if not isinstance(items, list):
+        return []
+    ids = [str(i["catalog_id"]) for i in items if isinstance(i, Mapping) and i.get("catalog_id")]
+    return list(dict.fromkeys(ids))
+
+
 def _format_materials_spec(value: Mapping[str, Any]) -> str | None:
     items = value.get("items")
     if not isinstance(items, list) or not items:
@@ -274,6 +290,7 @@ def _build_goals(slot_answers: Mapping[str, Mapping[str, Any] | None]) -> list[G
     frequency = _chip_frequency(slot_answers.get("goals.frequency"))
     approach_note = sv.text(slot_answers.get("goals.approach"))
     materials_note = _materials_note(slot_answers.get("goals.materials"))
+    curriculum = _curriculum_ids(slot_answers.get("goals.materials"))
 
     if not titles:
         return [
@@ -302,6 +319,7 @@ def _build_goals(slot_answers: Mapping[str, Mapping[str, Any] | None]) -> list[G
                 frequency_per_week=frequency if is_heaviest else None,
                 approach_note=approach_note if is_heaviest else None,
                 materials_note=materials_note if is_heaviest else None,
+                curriculum=curriculum if is_heaviest else [],
                 tentative_tier="focus" if is_heaviest else "maintain",
                 confidence=0.5,
             )

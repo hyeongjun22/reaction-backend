@@ -37,9 +37,9 @@ _PLAN = StudyMethodPlan(
 )
 
 
-def _stub_study_method(*, fell_back: bool = False) -> Any:
+def _stub_study_method(*, fell_back: bool = False, plan: StudyMethodPlan = _PLAN) -> Any:
     async def stub_run(**kwargs: Any) -> RunResult[Any]:
-        value = kwargs["fallback"]() if fell_back else _PLAN
+        value = kwargs["fallback"]() if fell_back else plan
         return RunResult(
             value=value,
             fell_back=fell_back,
@@ -74,6 +74,29 @@ def test_study_method_returns_approach_and_two_queries(
     assert body["aiSource"] == "llm"
     # 아직 검색으로 나간 게 아니라는 사실을 사용자가 알아야 편집할 이유가 생긴다(원칙 ①).
     assert "검색" in body["notice"]
+
+
+@pytest.mark.parametrize("mix", ["book", "video"])
+def test_study_method_passes_the_agents_material_mix_through(
+    client: TestClient,
+    fake_interview_repo: FakeInterviewRepo,
+    monkeypatch: pytest.MonkeyPatch,
+    mix: str,
+) -> None:
+    """에이전트가 고른 조합이 응답에 그대로 실린다 — 기본값("both")과 다른 값으로 확인한다.
+
+    응답을 만들며 이 필드를 빠뜨려, 에이전트가 무엇을 골랐든 클라이언트는 늘 기본값 "both"
+    를 받았다. 위 테스트는 에이전트도 "both" 를 고르는 경우라 그 누락을 볼 수 없었다.
+    """
+    _use_session(client, _FakeSession())
+    plan = _PLAN.model_copy(update={"material_mix": mix})
+    monkeypatch.setattr(materials.aiClient, "run", _stub_study_method(plan=plan))
+    client.portal.call(_seed_finished_interview, fake_interview_repo)  # type: ignore[attr-defined]
+
+    res = client.post("/plans/materials/study-method", json={})
+
+    assert res.status_code == 200
+    assert res.json()["materialMix"] == mix
 
 
 def test_study_method_falls_back_to_rule_and_reports_ai_source(

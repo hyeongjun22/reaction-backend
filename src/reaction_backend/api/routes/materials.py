@@ -50,10 +50,11 @@ from reaction_backend.api.deps import CurrentUser
 from reaction_backend.config import get_settings
 from reaction_backend.db.models.interview_session import InterviewSession
 from reaction_backend.db.session import get_db
+from reaction_backend.domain import curriculum as cur
 from reaction_backend.domain import slot_value as sv
 from reaction_backend.llm import aiClient
 from reaction_backend.llm.tool_executor import GroundedResult
-from reaction_backend.orchestrator import materials_catalog, materials_spec
+from reaction_backend.orchestrator import curriculum_plan, materials_catalog, materials_spec
 from reaction_backend.orchestrator._common import user_agent_lock
 from reaction_backend.orchestrator.interview_adapter import is_placeholder_goal
 from reaction_backend.orchestrator.interview_projection import project_session_outcome
@@ -85,7 +86,13 @@ from reaction_backend.schemas.materials_spec import (
     VideoDetailRequest,
     VideoDetailResponse,
 )
-from reaction_backend.schemas.study_method import StudyMethodRequest, StudyMethodResponse
+from reaction_backend.schemas.study_method import (
+    CuratedBook,
+    CurriculumConfirmRequest,
+    CurriculumConfirmResponse,
+    StudyMethodRequest,
+    StudyMethodResponse,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -373,12 +380,28 @@ async def propose_study_method(
 
     plan, fell_back = await study_method_agent.run(goal=goal, session=session, user_id=user.id)
     await session.commit()
+    curated = [
+        CuratedBook(
+            id=r.book.id,
+            title=r.book.title,
+            publisher=r.book.publisher,
+            role=r.book.role,
+            structure=r.book.structure,
+            unit_count=len(r.book.studyable()),
+            page_count=r.book.page_count,
+            reason=r.reason,
+            recommended=r.recommended,
+        )
+        for r in curriculum_plan.recommend(goal)
+    ]
 
     return StudyMethodResponse(
+        curated_books=curated,
         approach=plan.approach,
         focus_points=plan.focus_points,
         book_query=plan.book_query,
         video_query=plan.video_query,
+        material_mix=plan.material_mix,
         goal_title=goal.title,
         notice=(
             "이 검색어들이 그대로 도서/영상 검색에 쓰여요. 빼고 싶은 내용이 있으면 고쳐 "
@@ -481,4 +504,51 @@ async def confirm_spec(
         kinds=[d.kind for d in body.details],
         notice="자료를 반영했어요. 다음 계획 생성부터 이 목차를 뼈대로 삼아요.",
         book_pace=book_pace,
+    )
+
+
+@router.post("/curriculum-confirm")
+async def confirm_curriculum(
+    body: CurriculumConfirmRequest,
+    user: CurrentUser,
+    repo: RepoDep,
+    session: SessionDep,
+) -> CurriculumConfirmResponse:
+    """ "이 교재들로 할게요" — 교재 카드를 `goals.materials` 에 확정한다.
+
+    `spec-confirm` 과 같은 슬롯·같은 규칙(마지막 확정이 이긴다)을 쓰되, 항목을 클라이언트가
+    보낸 값이 아니라 **서버의 카드**로 만든다 — 단원 목록이 계획의 뼈대가 되므로 신뢰할 수
+    없는 입력으로 받지 않는다. 항목에 `catalog_id` 가 실려, 다음 마일스톤·계획 생성이 LLM
+    대신 이 책들의 단원 순서로 짜인다(`orchestrator/curriculum_plan.py`).
+
+    카드에 없는 id 는 422 — 모르는 책을 조용히 빼면 사용자는 고른 책이 계획에 없는 이유를 모른다.
+    """
+    session_row = await _resolve_session(repo, user.id, body.interview_session_id)
+    outcome = await project_session_outcome(session_row, repo)
+    goal = _heaviest(outcome)
+
+    ids = list(dict.fromkeys(body.book_ids))
+    books = [cur.book(i) for i in ids]
+    if any(b is None for b in books):
+        raise ApiError(
+            ErrorCode.COMMON_VALIDATION_ERROR,
+            "고른 교재를 찾지 못했어요. 목록을 다시 불러와 주세요.",
+            http_status=HTTPStatus.UNPROCESSABLE_ENTITY,
+            field="bookIds",
+        )
+
+    await repo.upsert_slot_answer(
+        session_row.id,
+        _MATERIALS_SLOT,
+        sv.dump(
+            sv.SpecAnswer(tuple(curriculum_plan.card_spec_item(b) for b in books if b is not None))
+        ),
+        is_required=True,
+    )
+    await session.commit()
+
+    return CurriculumConfirmResponse(
+        goal_title=goal.title,
+        book_ids=ids,
+        notice="교재를 반영했어요. 다음 계획부터 이 책들의 단원 순서대로 세션을 짜요.",
     )

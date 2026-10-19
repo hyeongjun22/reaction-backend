@@ -63,3 +63,40 @@ class StudyMethodResponse(DraftMixin, StudyMethodPlan):
 
     goal_title: str
     notice: str
+    curated_books: list[CuratedBook] = Field(default_factory=list)
+    """목표가 교재 카드가 있는 시험(지금은 토익)이면 추천 교재 카드. 없으면 빈 배열 —
+    그때는 예전처럼 검색어로 알라딘/YouTube 를 찾는다. 카드를 고르면
+    `/plans/materials/curriculum-confirm` 으로 확정하고, 계획이 그 책의 단원 순서로 짜인다."""
+
+
+class CuratedBook(CamelModel):
+    """추천 교재 카드 한 장 — 구조 요약과 추천 이유. 단원 목록 자체는 싣지 않는다(카드에만 있다)."""
+
+    id: str
+    title: str
+    publisher: str
+    role: Literal["vocab", "starter", "core", "all_in_one", "practice"]
+    structure: str
+    """한 문장 구성 설명 — "30 DAY 단어 학습 + 10일마다 실전 문제"."""
+    unit_count: int
+    page_count: int
+    reason: str
+    """이 사용자에게 왜 이 책인지(현재 점수·목표 점수 기준)."""
+    recommended: bool
+    """기본으로 골라 둘 책인가 — `False` 는 대안·선택 사항(사용자가 직접 고르면 쓴다)."""
+
+
+class CurriculumConfirmRequest(CamelModel):
+    """POST /plans/materials/curriculum-confirm — "이 교재들로 할게요".
+
+    카드 id 만 받는다 — 제목·단원은 서버의 카드에서 꺼낸다(클라이언트가 보낸 단원을 믿지 않는다).
+    """
+
+    book_ids: list[str] = Field(min_length=1, max_length=4)
+    interview_session_id: str | None = None
+
+
+class CurriculumConfirmResponse(CamelModel):
+    goal_title: str
+    book_ids: list[str]
+    notice: str

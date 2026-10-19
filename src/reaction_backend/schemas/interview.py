@@ -287,6 +287,10 @@ class GoalCandidate(CamelModel):
     # 또는 자료 검색 파이프라인(ADR-0010)이 확정한 도서/영상 상세를 텍스트로 풀어낸 요약.
     # pointer('내 프로젝트')가 아니라 내용이 있어야 분해가 그 기능·목차대로 뼈대를 잡는다.
     materials_note: str | None = None
+    # goals.materials 에서 사용자가 **교재 카드**(`domain/curriculum_cards`)로 확정한 책의 id.
+    # 있으면 마일스톤·세션이 LLM 이 아니라 그 책의 단원 순서로 만들어진다(`curriculum_plan`).
+    # 카드에 없는 책(알라딘 검색·붙여넣기)은 여기 들어오지 않고 `materials_note` 로만 간다.
+    curriculum: list[str] = Field(default_factory=list)
     tentative_tier: Literal["focus", "maintain", "parked"] = "maintain"
     # ⚠️ **`clarity_score` 와 무관하다.** `interview_adapter` 가 목표 출처에 따라 코드로
     # 박는다 — 추론 목록이면 0.0, 사용자가 고른 heaviest 면 0.5. 예전 주석이 "해당 슬롯

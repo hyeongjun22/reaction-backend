@@ -1,0 +1,2443 @@
+{
+  "_note": "토익 교재 카드. 구조(단원 순서·종류)와 짧은 주제어만 담는다 — 출처는 예스24 공개 목차(2026-10-20 확인). 목차의 창작 제목('백수탈출' 등)은 옮기지 않고 분야 이름만 적는다. 분 단위 minutes 는 추정치다.",
+  "books": [
+    {
+      "id": "hackers-toeic-voca",
+      "title": "해커스 토익 기출 VOCA (보카)",
+      "short": "기출 VOCA",
+      "publisher": "해커스어학연구소",
+      "isbn13": "9788965422785",
+      "page_count": 556,
+      "role": "vocab",
+      "exam": "toeic",
+      "score_band": [
+        0,
+        990
+      ],
+      "structure": "주제별 30 DAY 단어 학습 + 10 DAY마다 실전 문제",
+      "source_url": "https://www.yes24.com/product/goods/67362730",
+      "unit_minutes": {
+        "lesson": 25,
+        "practice_test": 15,
+        "review": 20,
+        "appendix": 0
+      },
+      "units": [
+        {
+          "id": "DAY01",
+          "label": "DAY 01",
+          "section": "VOCA",
+          "topic": "채용",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY02",
+          "label": "DAY 02",
+          "section": "VOCA",
+          "topic": "규칙·법률",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY03",
+          "label": "DAY 03",
+          "section": "VOCA",
+          "topic": "일반사무 1",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY04",
+          "label": "DAY 04",
+          "section": "VOCA",
+          "topic": "일반사무 2",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY05",
+          "label": "DAY 05",
+          "section": "VOCA",
+          "topic": "일반사무 3",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY06",
+          "label": "DAY 06",
+          "section": "VOCA",
+          "topic": "여가·공동체",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY07",
+          "label": "DAY 07",
+          "section": "VOCA",
+          "topic": "마케팅 1",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY08",
+          "label": "DAY 08",
+          "section": "VOCA",
+          "topic": "마케팅 2",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY09",
+          "label": "DAY 09",
+          "section": "VOCA",
+          "topic": "경제",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY10",
+          "label": "DAY 10",
+          "section": "VOCA",
+          "topic": "쇼핑",
+          "kind": "lesson"
+        },
+        {
+          "id": "TEST1",
+          "label": "실전 문제 1",
+          "section": "실전",
+          "topic": "DAY 01–10 점검",
+          "kind": "practice_test"
+        },
+        {
+          "id": "DAY11",
+          "label": "DAY 11",
+          "section": "VOCA",
+          "topic": "제품개발",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY12",
+          "label": "DAY 12",
+          "section": "VOCA",
+          "topic": "생산",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY13",
+          "label": "DAY 13",
+          "section": "VOCA",
+          "topic": "고객서비스",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY14",
+          "label": "DAY 14",
+          "section": "VOCA",
+          "topic": "여행·공항",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY15",
+          "label": "DAY 15",
+          "section": "VOCA",
+          "topic": "계약",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY16",
+          "label": "DAY 16",
+          "section": "VOCA",
+          "topic": "상거래",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY17",
+          "label": "DAY 17",
+          "section": "VOCA",
+          "topic": "무역·배송",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY18",
+          "label": "DAY 18",
+          "section": "VOCA",
+          "topic": "숙박·식당",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY19",
+          "label": "DAY 19",
+          "section": "VOCA",
+          "topic": "수익",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY20",
+          "label": "DAY 20",
+          "section": "VOCA",
+          "topic": "회계",
+          "kind": "lesson"
+        },
+        {
+          "id": "TEST2",
+          "label": "실전 문제 2",
+          "section": "실전",
+          "topic": "DAY 11–20 점검",
+          "kind": "practice_test"
+        },
+        {
+          "id": "DAY21",
+          "label": "DAY 21",
+          "section": "VOCA",
+          "topic": "회사동향",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY22",
+          "label": "DAY 22",
+          "section": "VOCA",
+          "topic": "미팅",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY23",
+          "label": "DAY 23",
+          "section": "VOCA",
+          "topic": "사원 복지",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY24",
+          "label": "DAY 24",
+          "section": "VOCA",
+          "topic": "인사이동",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY25",
+          "label": "DAY 25",
+          "section": "VOCA",
+          "topic": "교통",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY26",
+          "label": "DAY 26",
+          "section": "VOCA",
+          "topic": "은행",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY27",
+          "label": "DAY 27",
+          "section": "VOCA",
+          "topic": "투자",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY28",
+          "label": "DAY 28",
+          "section": "VOCA",
+          "topic": "건물·주택",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY29",
+          "label": "DAY 29",
+          "section": "VOCA",
+          "topic": "환경",
+          "kind": "lesson"
+        },
+        {
+          "id": "DAY30",
+          "label": "DAY 30",
+          "section": "VOCA",
+          "topic": "건강",
+          "kind": "lesson"
+        },
+        {
+          "id": "TEST3",
+          "label": "실전 문제 3",
+          "section": "실전",
+          "topic": "DAY 21–30 점검",
+          "kind": "practice_test"
+        },
+        {
+          "id": "ANSWERS",
+          "label": "정답·해설",
+          "section": "부록",
+          "topic": "정답·해설",
+          "kind": "appendix"
+        },
+        {
+          "id": "IDIOMS",
+          "label": "필수 이디엄",
+          "section": "부록",
+          "topic": "이디엄 표현",
+          "kind": "appendix"
+        },
+        {
+          "id": "INDEX",
+          "label": "인덱스",
+          "section": "부록",
+          "topic": "인덱스",
+          "kind": "appendix"
+        }
+      ]
+    },
+    {
+      "id": "hackers-toeic-700plus",
+      "title": "한 권으로 끝내는 해커스 토익 700+ (LC+RC+VOCA)",
+      "short": "700+",
+      "publisher": "해커스어학연구소",
+      "isbn13": "9788965424628",
+      "page_count": 604,
+      "role": "all_in_one",
+      "exam": "toeic",
+      "score_band": [
+        450,
+        699
+      ],
+      "structure": "LC·RC·VOCA 각 20 DAY를 하루씩 나란히 + 실전모의고사 1회",
+      "source_url": "https://www.yes24.com/product/goods/105853213",
+      "unit_minutes": {
+        "lesson": 30,
+        "practice_test": 120,
+        "review": 30,
+        "appendix": 0
+      },
+      "units": [
+        {
+          "id": "LC-DAY01",
+          "label": "DAY 01",
+          "section": "LC 기초",
+          "topic": "발음 구별",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY01",
+          "label": "DAY 01",
+          "section": "RC 기초",
+          "topic": "문장 성분·패러프레이징",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY01",
+          "label": "DAY 01",
+          "section": "VOCA Part 5·6",
+          "topic": "명사 1",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY02",
+          "label": "DAY 02",
+          "section": "LC 기초",
+          "topic": "연음·끊어 듣기",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY02",
+          "label": "DAY 02",
+          "section": "RC Part 5·6 문법",
+          "topic": "문장 성분",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY02",
+          "label": "DAY 02",
+          "section": "VOCA Part 5·6",
+          "topic": "명사 2",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY03",
+          "label": "DAY 03",
+          "section": "LC Part 1",
+          "topic": "사람 중심 사진",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY03",
+          "label": "DAY 03",
+          "section": "RC Part 5·6 문법",
+          "topic": "동사 형태·수일치",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY03",
+          "label": "DAY 03",
+          "section": "VOCA Part 5·6",
+          "topic": "명사 3",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY04",
+          "label": "DAY 04",
+          "section": "LC Part 1",
+          "topic": "사물·풍경 사진",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY04",
+          "label": "DAY 04",
+          "section": "RC Part 5·6 문법",
+          "topic": "태·시제·가정법",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY04",
+          "label": "DAY 04",
+          "section": "VOCA Part 5·6",
+          "topic": "명사 4",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY05",
+          "label": "DAY 05",
+          "section": "LC Part 2",
+          "topic": "Who·Where 의문문",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY05",
+          "label": "DAY 05",
+          "section": "RC Part 5·6 문법",
+          "topic": "to 부정사·동명사·분사",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY05",
+          "label": "DAY 05",
+          "section": "VOCA Part 5·6",
+          "topic": "명사 5",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY06",
+          "label": "DAY 06",
+          "section": "LC Part 2",
+          "topic": "When·What·Which 의문문",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY06",
+          "label": "DAY 06",
+          "section": "RC Part 5·6 문법",
+          "topic": "명사·대명사",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY06",
+          "label": "DAY 06",
+          "section": "VOCA Part 5·6",
+          "topic": "동사 1",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY07",
+          "label": "DAY 07",
+          "section": "LC Part 2",
+          "topic": "Why·How 의문문",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY07",
+          "label": "DAY 07",
+          "section": "RC Part 5·6 문법",
+          "topic": "형용사·부사",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY07",
+          "label": "DAY 07",
+          "section": "VOCA Part 5·6",
+          "topic": "동사 2",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY08",
+          "label": "DAY 08",
+          "section": "LC Part 2",
+          "topic": "일반 의문문·평서문",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY08",
+          "label": "DAY 08",
+          "section": "RC Part 5·6 문법",
+          "topic": "전치사",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY08",
+          "label": "DAY 08",
+          "section": "VOCA Part 5·6",
+          "topic": "동사 3",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY09",
+          "label": "DAY 09",
+          "section": "LC Part 2",
+          "topic": "선택·부가 의문문",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY09",
+          "label": "DAY 09",
+          "section": "RC Part 5·6 문법",
+          "topic": "등위접속사·관계절",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY09",
+          "label": "DAY 09",
+          "section": "VOCA Part 5·6",
+          "topic": "동사 4",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY10",
+          "label": "DAY 10",
+          "section": "LC Part 3",
+          "topic": "주제·화자·장소 문제",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY10",
+          "label": "DAY 10",
+          "section": "RC Part 5·6 문법",
+          "topic": "부사절·명사절",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY10",
+          "label": "DAY 10",
+          "section": "VOCA Part 5·6",
+          "topic": "형용사 1",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY11",
+          "label": "DAY 11",
+          "section": "LC Part 3",
+          "topic": "요청·제안·언급 문제",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY11",
+          "label": "DAY 11",
+          "section": "RC Part 5·6 문법",
+          "topic": "비교·병치·도치",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY11",
+          "label": "DAY 11",
+          "section": "VOCA Part 5·6",
+          "topic": "형용사 2",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY12",
+          "label": "DAY 12",
+          "section": "LC Part 3",
+          "topic": "이유·방법·문제점 문제",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY12",
+          "label": "DAY 12",
+          "section": "RC Part 6",
+          "topic": "단어·문장 고르기",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY12",
+          "label": "DAY 12",
+          "section": "VOCA Part 5·6",
+          "topic": "형용사 3",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY13",
+          "label": "DAY 13",
+          "section": "LC Part 3",
+          "topic": "세부 사항·다음 할 일",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY13",
+          "label": "DAY 13",
+          "section": "RC Part 7 질문 유형",
+          "topic": "주제·목적 찾기",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY13",
+          "label": "DAY 13",
+          "section": "VOCA Part 5·6",
+          "topic": "형용사 4",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY14",
+          "label": "DAY 14",
+          "section": "LC Part 3",
+          "topic": "의도 파악·추론",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY14",
+          "label": "DAY 14",
+          "section": "RC Part 7 질문 유형",
+          "topic": "육하원칙·Not/True",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY14",
+          "label": "DAY 14",
+          "section": "VOCA Part 5·6",
+          "topic": "부사 1",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY15",
+          "label": "DAY 15",
+          "section": "LC Part 3",
+          "topic": "시각 자료 문제",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY15",
+          "label": "DAY 15",
+          "section": "RC Part 7 질문 유형",
+          "topic": "추론·문장 위치",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY15",
+          "label": "DAY 15",
+          "section": "VOCA Part 5·6",
+          "topic": "부사 2",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY16",
+          "label": "DAY 16",
+          "section": "LC Part 4",
+          "topic": "주제·화자·장소 문제",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY16",
+          "label": "DAY 16",
+          "section": "RC Part 7 질문 유형",
+          "topic": "의도 파악·동의어",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY16",
+          "label": "DAY 16",
+          "section": "VOCA Part 5·6",
+          "topic": "부사 3",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY17",
+          "label": "DAY 17",
+          "section": "LC Part 4",
+          "topic": "요청·제안·이유 문제",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY17",
+          "label": "DAY 17",
+          "section": "RC Part 7 지문 유형",
+          "topic": "이메일·메시지 대화문",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY17",
+          "label": "DAY 17",
+          "section": "VOCA Part 5·6",
+          "topic": "형용사 관련 어구",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY18",
+          "label": "DAY 18",
+          "section": "LC Part 4",
+          "topic": "세부 사항·다음 할 일",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY18",
+          "label": "DAY 18",
+          "section": "RC Part 7 지문 유형",
+          "topic": "양식·광고",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY18",
+          "label": "DAY 18",
+          "section": "VOCA Part 5·6",
+          "topic": "동사 관련 어구",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY19",
+          "label": "DAY 19",
+          "section": "LC Part 4",
+          "topic": "의도 파악·추론",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY19",
+          "label": "DAY 19",
+          "section": "RC Part 7 지문 유형",
+          "topic": "기사·공고·회람",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY19",
+          "label": "DAY 19",
+          "section": "VOCA Part 5·6",
+          "topic": "명사 관련 어구",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "LC-DAY20",
+          "label": "DAY 20",
+          "section": "LC Part 4",
+          "topic": "시각 자료 문제",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-DAY20",
+          "label": "DAY 20",
+          "section": "RC Part 7 지문 유형",
+          "topic": "이중·삼중 지문",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "VOCA-DAY20",
+          "label": "DAY 20",
+          "section": "VOCA Part 5·6",
+          "topic": "짝을 이루는 표현",
+          "kind": "lesson",
+          "track": "VOCA"
+        },
+        {
+          "id": "TEST01",
+          "label": "실전모의고사",
+          "section": "실전",
+          "topic": "LC+RC 1회",
+          "kind": "practice_test"
+        }
+      ]
+    },
+    {
+      "id": "ets-toeic-750plus",
+      "title": "ETS 토익 단기공략 750+ (LC+RC)",
+      "short": "ETS 750+",
+      "publisher": "YBM(와이비엠)",
+      "isbn13": "9788917243789",
+      "page_count": 556,
+      "role": "all_in_one",
+      "exam": "toeic",
+      "score_band": [
+        550,
+        749
+      ],
+      "structure": "LC 14 Unit + RC 20 Unit, 파트마다 실전 점검 + 모의고사 1회",
+      "source_url": "https://www.yes24.com/product/goods/148193221",
+      "unit_minutes": {
+        "lesson": 40,
+        "practice_test": 120,
+        "review": 30,
+        "appendix": 0
+      },
+      "units": [
+        {
+          "id": "RC-U01",
+          "label": "Unit 01",
+          "section": "RC Part 5·6",
+          "topic": "품사·문장 구조",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-U01",
+          "label": "Unit 01",
+          "section": "LC Part 1",
+          "topic": "인물 등장 사진",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-U02",
+          "label": "Unit 02",
+          "section": "RC Part 5·6",
+          "topic": "명사",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-U02",
+          "label": "Unit 02",
+          "section": "LC Part 1",
+          "topic": "사물·풍경 사진",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-U03",
+          "label": "Unit 03",
+          "section": "RC Part 5·6",
+          "topic": "대명사",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-P1-TEST",
+          "label": "Part 1 실전",
+          "section": "LC Part 1",
+          "topic": "파트 점검",
+          "kind": "review",
+          "track": "LC"
+        },
+        {
+          "id": "RC-U04",
+          "label": "Unit 04",
+          "section": "RC Part 5·6",
+          "topic": "형용사",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-U03",
+          "label": "Unit 03",
+          "section": "LC Part 2",
+          "topic": "Who·When·Where 의문문",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-U05",
+          "label": "Unit 05",
+          "section": "RC Part 5·6",
+          "topic": "부사",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-U04",
+          "label": "Unit 04",
+          "section": "LC Part 2",
+          "topic": "What·Which·Why·How 의문문",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-U06",
+          "label": "Unit 06",
+          "section": "RC Part 5·6",
+          "topic": "동사 형태·종류",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "RC-U07",
+          "label": "Unit 07",
+          "section": "RC Part 5·6",
+          "topic": "수일치·태",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-U05",
+          "label": "Unit 05",
+          "section": "LC Part 2",
+          "topic": "일반·부정·부가 의문문",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-U08",
+          "label": "Unit 08",
+          "section": "RC Part 5·6",
+          "topic": "시제",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-U06",
+          "label": "Unit 06",
+          "section": "LC Part 2",
+          "topic": "선택·요청·평서문",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-U09",
+          "label": "Unit 09",
+          "section": "RC Part 5·6",
+          "topic": "to부정사·동명사",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-P2-TEST",
+          "label": "Part 2 실전",
+          "section": "LC Part 2",
+          "topic": "파트 점검",
+          "kind": "review",
+          "track": "LC"
+        },
+        {
+          "id": "RC-U10",
+          "label": "Unit 10",
+          "section": "RC Part 5·6",
+          "topic": "분사·분사구문",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-U07",
+          "label": "Unit 07",
+          "section": "LC Part 3",
+          "topic": "주제·목적·화자·장소",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-U11",
+          "label": "Unit 11",
+          "section": "RC Part 5·6",
+          "topic": "전치사·접속사",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "RC-U12",
+          "label": "Unit 12",
+          "section": "RC Part 5·6",
+          "topic": "부사절 접속사",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-U08",
+          "label": "Unit 08",
+          "section": "LC Part 3",
+          "topic": "세부 사항·문제점",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-U13",
+          "label": "Unit 13",
+          "section": "RC Part 5·6",
+          "topic": "관계대명사",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-U09",
+          "label": "Unit 09",
+          "section": "LC Part 3",
+          "topic": "요청·제안·다음 할 일",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-U14",
+          "label": "Unit 14",
+          "section": "RC Part 5·6",
+          "topic": "명사절 접속사",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-U10",
+          "label": "Unit 10",
+          "section": "LC Part 3",
+          "topic": "의도 파악·시각 정보",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-U15",
+          "label": "Unit 15",
+          "section": "RC Part 5·6",
+          "topic": "비교·도치 구문",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-P3-TEST",
+          "label": "Part 3 실전",
+          "section": "LC Part 3",
+          "topic": "파트 점검",
+          "kind": "review",
+          "track": "LC"
+        },
+        {
+          "id": "RC-U16",
+          "label": "Unit 16",
+          "section": "RC Part 5·6",
+          "topic": "어휘",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-U11",
+          "label": "Unit 11",
+          "section": "LC Part 4",
+          "topic": "전화 메시지",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-P56-TEST",
+          "label": "Part 5·6 실전",
+          "section": "RC Part 5·6",
+          "topic": "파트 점검",
+          "kind": "review",
+          "track": "RC"
+        },
+        {
+          "id": "RC-U17",
+          "label": "Unit 17",
+          "section": "RC Part 7",
+          "topic": "편지·이메일",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-U12",
+          "label": "Unit 12",
+          "section": "LC Part 4",
+          "topic": "공지·회의",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-U18",
+          "label": "Unit 18",
+          "section": "RC Part 7",
+          "topic": "회람·공지·광고·기사",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-U13",
+          "label": "Unit 13",
+          "section": "LC Part 4",
+          "topic": "설명·소개",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-U19",
+          "label": "Unit 19",
+          "section": "RC Part 7",
+          "topic": "메시지·웹페이지·기타",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-U14",
+          "label": "Unit 14",
+          "section": "LC Part 4",
+          "topic": "광고·방송",
+          "kind": "lesson",
+          "track": "LC"
+        },
+        {
+          "id": "RC-U20",
+          "label": "Unit 20",
+          "section": "RC Part 7",
+          "topic": "복수 지문",
+          "kind": "lesson",
+          "track": "RC"
+        },
+        {
+          "id": "LC-P4-TEST",
+          "label": "Part 4 실전",
+          "section": "LC Part 4",
+          "topic": "파트 점검",
+          "kind": "review",
+          "track": "LC"
+        },
+        {
+          "id": "RC-P7-TEST",
+          "label": "Part 7 실전",
+          "section": "RC Part 7",
+          "topic": "파트 점검",
+          "kind": "review",
+          "track": "RC"
+        },
+        {
+          "id": "TEST01",
+          "label": "실전 모의고사",
+          "section": "실전",
+          "topic": "LC+RC 1회",
+          "kind": "practice_test"
+        }
+      ]
+    },
+    {
+      "id": "hackers-toeic-rc",
+      "title": "해커스 토익 RC Reading(리딩) 기본서",
+      "short": "RC 기본서",
+      "publisher": "해커스어학연구소",
+      "isbn13": "9788965424765",
+      "page_count": 816,
+      "role": "core",
+      "exam": "toeic",
+      "score_band": [
+        500,
+        899
+      ],
+      "structure": "문법 20 · 어휘 12 · Part 6 2 · Part 7 20 Chapter + 진단·모의고사",
+      "source_url": "https://www.yes24.com/product/goods/116020437",
+      "unit_minutes": {
+        "lesson": 40,
+        "practice_test": 75,
+        "review": 30,
+        "appendix": 0
+      },
+      "units": [
+        {
+          "id": "DIAG",
+          "label": "진단고사",
+          "section": "진단",
+          "topic": "RC 진단",
+          "kind": "practice_test"
+        },
+        {
+          "id": "GR-CH01",
+          "label": "Ch.01",
+          "section": "RC Part 5·6 문법: 문장패턴",
+          "topic": "주어·동사",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "P7-CH01",
+          "label": "Ch.01",
+          "section": "RC Part 7 질문 유형",
+          "topic": "주제·목적 찾기",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "VOCA-CH01",
+          "label": "Ch.01",
+          "section": "RC Part 5·6 어휘",
+          "topic": "동사 어휘",
+          "kind": "lesson",
+          "track": "어휘"
+        },
+        {
+          "id": "GR-CH02",
+          "label": "Ch.02",
+          "section": "RC Part 5·6 문법: 문장패턴",
+          "topic": "목적어·보어·수식어",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "P7-CH02",
+          "label": "Ch.02",
+          "section": "RC Part 7 질문 유형",
+          "topic": "육하원칙 문제",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "GR-CH03",
+          "label": "Ch.03",
+          "section": "RC Part 5·6 문법: 동사구",
+          "topic": "동사의 형태와 종류",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "VOCA-CH02",
+          "label": "Ch.02",
+          "section": "RC Part 5·6 어휘",
+          "topic": "명사 어휘",
+          "kind": "lesson",
+          "track": "어휘"
+        },
+        {
+          "id": "P7-CH03",
+          "label": "Ch.03",
+          "section": "RC Part 7 질문 유형",
+          "topic": "Not/True 문제",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "GR-CH04",
+          "label": "Ch.04",
+          "section": "RC Part 5·6 문법: 동사구",
+          "topic": "주어와의 수일치",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "P7-CH04",
+          "label": "Ch.04",
+          "section": "RC Part 7 질문 유형",
+          "topic": "추론 문제",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "VOCA-CH03",
+          "label": "Ch.03",
+          "section": "RC Part 5·6 어휘",
+          "topic": "형용사 어휘",
+          "kind": "lesson",
+          "track": "어휘"
+        },
+        {
+          "id": "GR-CH05",
+          "label": "Ch.05",
+          "section": "RC Part 5·6 문법: 동사구",
+          "topic": "능동태·수동태",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "P7-CH05",
+          "label": "Ch.05",
+          "section": "RC Part 7 질문 유형",
+          "topic": "의도 파악 문제",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "P6-CH01",
+          "label": "Ch.01",
+          "section": "RC Part 6",
+          "topic": "단어 고르기 문제",
+          "kind": "lesson",
+          "track": "Part 6"
+        },
+        {
+          "id": "GR-CH06",
+          "label": "Ch.06",
+          "section": "RC Part 5·6 문법: 동사구",
+          "topic": "시제·가정법",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "P7-CH06",
+          "label": "Ch.06",
+          "section": "RC Part 7 질문 유형",
+          "topic": "문장 위치 찾기",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "VOCA-CH04",
+          "label": "Ch.04",
+          "section": "RC Part 5·6 어휘",
+          "topic": "부사 어휘",
+          "kind": "lesson",
+          "track": "어휘"
+        },
+        {
+          "id": "GR-CH07",
+          "label": "Ch.07",
+          "section": "RC Part 5·6 문법: 준동사구",
+          "topic": "to 부정사",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "P7-CH07",
+          "label": "Ch.07",
+          "section": "RC Part 7 질문 유형",
+          "topic": "동의어 찾기",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "GR-CH08",
+          "label": "Ch.08",
+          "section": "RC Part 5·6 문법: 준동사구",
+          "topic": "동명사",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "VOCA-CH05",
+          "label": "Ch.05",
+          "section": "RC Part 5·6 어구",
+          "topic": "형용사 관련 어구",
+          "kind": "lesson",
+          "track": "어휘"
+        },
+        {
+          "id": "P7-CH08",
+          "label": "Ch.08",
+          "section": "RC Part 7 단일 지문",
+          "topic": "이메일·편지",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "GR-CH09",
+          "label": "Ch.09",
+          "section": "RC Part 5·6 문법: 준동사구",
+          "topic": "분사",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "P7-CH09",
+          "label": "Ch.09",
+          "section": "RC Part 7 단일 지문",
+          "topic": "양식",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "VOCA-CH06",
+          "label": "Ch.06",
+          "section": "RC Part 5·6 어구",
+          "topic": "동사 관련 어구 1",
+          "kind": "lesson",
+          "track": "어휘"
+        },
+        {
+          "id": "GR-CH10",
+          "label": "Ch.10",
+          "section": "RC Part 5·6 문법: 품사",
+          "topic": "명사",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "P7-CH10",
+          "label": "Ch.10",
+          "section": "RC Part 7 단일 지문",
+          "topic": "기사",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "GR-CH11",
+          "label": "Ch.11",
+          "section": "RC Part 5·6 문법: 품사",
+          "topic": "대명사",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "P7-CH11",
+          "label": "Ch.11",
+          "section": "RC Part 7 단일 지문",
+          "topic": "메시지 대화문",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "VOCA-CH07",
+          "label": "Ch.07",
+          "section": "RC Part 5·6 어구",
+          "topic": "동사 관련 어구 2",
+          "kind": "lesson",
+          "track": "어휘"
+        },
+        {
+          "id": "GR-CH12",
+          "label": "Ch.12",
+          "section": "RC Part 5·6 문법: 품사",
+          "topic": "형용사",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "P7-CH12",
+          "label": "Ch.12",
+          "section": "RC Part 7 단일 지문",
+          "topic": "광고",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "GR-CH13",
+          "label": "Ch.13",
+          "section": "RC Part 5·6 문법: 품사",
+          "topic": "부사",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "VOCA-CH08",
+          "label": "Ch.08",
+          "section": "RC Part 5·6 어구",
+          "topic": "명사 관련 어구",
+          "kind": "lesson",
+          "track": "어휘"
+        },
+        {
+          "id": "P7-CH13",
+          "label": "Ch.13",
+          "section": "RC Part 7 단일 지문",
+          "topic": "공고",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "GR-CH14",
+          "label": "Ch.14",
+          "section": "RC Part 5·6 문법: 품사",
+          "topic": "전치사",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "P7-CH14",
+          "label": "Ch.14",
+          "section": "RC Part 7 단일 지문",
+          "topic": "회람",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "VOCA-CH09",
+          "label": "Ch.09",
+          "section": "RC Part 5·6 어구",
+          "topic": "짝을 이루는 표현",
+          "kind": "lesson",
+          "track": "어휘"
+        },
+        {
+          "id": "GR-CH15",
+          "label": "Ch.15",
+          "section": "RC Part 5·6 문법: 접속사와 절",
+          "topic": "등위·상관접속사",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "P7-CH15",
+          "label": "Ch.15",
+          "section": "RC Part 7 단일 지문",
+          "topic": "안내문",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "P6-CH02",
+          "label": "Ch.02",
+          "section": "RC Part 6",
+          "topic": "문장 고르기 문제",
+          "kind": "lesson",
+          "track": "Part 6"
+        },
+        {
+          "id": "GR-CH16",
+          "label": "Ch.16",
+          "section": "RC Part 5·6 문법: 접속사와 절",
+          "topic": "관계절",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "P7-CH16",
+          "label": "Ch.16",
+          "section": "RC Part 7 다중 지문",
+          "topic": "이메일 연계 지문",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "VOCA-CH10",
+          "label": "Ch.10",
+          "section": "RC Part 5·6 유사의미어",
+          "topic": "유사의미 동사",
+          "kind": "lesson",
+          "track": "어휘"
+        },
+        {
+          "id": "GR-CH17",
+          "label": "Ch.17",
+          "section": "RC Part 5·6 문법: 접속사와 절",
+          "topic": "부사절",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "P7-CH17",
+          "label": "Ch.17",
+          "section": "RC Part 7 다중 지문",
+          "topic": "양식 연계 지문",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "GR-CH18",
+          "label": "Ch.18",
+          "section": "RC Part 5·6 문법: 접속사와 절",
+          "topic": "명사절",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "VOCA-CH11",
+          "label": "Ch.11",
+          "section": "RC Part 5·6 유사의미어",
+          "topic": "유사의미 명사",
+          "kind": "lesson",
+          "track": "어휘"
+        },
+        {
+          "id": "P7-CH18",
+          "label": "Ch.18",
+          "section": "RC Part 7 다중 지문",
+          "topic": "기사 연계 지문",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "GR-CH19",
+          "label": "Ch.19",
+          "section": "RC Part 5·6 문법: 특수구문",
+          "topic": "비교 구문",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "P7-CH19",
+          "label": "Ch.19",
+          "section": "RC Part 7 다중 지문",
+          "topic": "광고 연계 지문",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "VOCA-CH12",
+          "label": "Ch.12",
+          "section": "RC Part 5·6 유사의미어",
+          "topic": "유사의미 형용사·부사",
+          "kind": "lesson",
+          "track": "어휘"
+        },
+        {
+          "id": "GR-CH20",
+          "label": "Ch.20",
+          "section": "RC Part 5·6 문법: 특수구문",
+          "topic": "병치·도치 구문",
+          "kind": "lesson",
+          "track": "문법"
+        },
+        {
+          "id": "P7-CH20",
+          "label": "Ch.20",
+          "section": "RC Part 7 다중 지문",
+          "topic": "공고 연계 지문",
+          "kind": "lesson",
+          "track": "Part 7"
+        },
+        {
+          "id": "TEST01",
+          "label": "실전모의고사 1",
+          "section": "실전",
+          "topic": "RC 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST02",
+          "label": "실전모의고사 2",
+          "section": "실전",
+          "topic": "RC 1회",
+          "kind": "practice_test"
+        }
+      ]
+    },
+    {
+      "id": "hackers-toeic-lc",
+      "title": "해커스 토익 LC Listening(리스닝) 기본서",
+      "short": "LC 기본서",
+      "publisher": "해커스어학연구소",
+      "isbn13": "9788965424772",
+      "page_count": 620,
+      "role": "core",
+      "exam": "toeic",
+      "score_band": [
+        500,
+        899
+      ],
+      "structure": "Part 1~4 기본·Course·Part Test + 진단·모의고사 2회",
+      "source_url": "https://www.yes24.com/product/goods/116020471",
+      "unit_minutes": {
+        "lesson": 60,
+        "practice_test": 45,
+        "review": 30,
+        "appendix": 0
+      },
+      "units": [
+        {
+          "id": "DIAG",
+          "label": "진단고사",
+          "section": "진단",
+          "topic": "LC 진단",
+          "kind": "practice_test"
+        },
+        {
+          "id": "PRON",
+          "label": "발음",
+          "section": "LC 기초",
+          "topic": "미국식·영국식 발음",
+          "kind": "lesson"
+        },
+        {
+          "id": "P1-BASIC",
+          "label": "Part 1 기본",
+          "section": "LC Part 1",
+          "topic": "Part 1 기본 다지기",
+          "kind": "lesson"
+        },
+        {
+          "id": "P1-C1",
+          "label": "Part 1 Course 1",
+          "section": "LC Part 1",
+          "topic": "사진 유형별 공략",
+          "kind": "lesson"
+        },
+        {
+          "id": "P1-C2",
+          "label": "Part 1 Course 2",
+          "section": "LC Part 1",
+          "topic": "사진 상황별 공략",
+          "kind": "lesson"
+        },
+        {
+          "id": "P1-TEST",
+          "label": "Part 1 Test",
+          "section": "LC Part 1",
+          "topic": "Part 1 Part Test",
+          "kind": "review"
+        },
+        {
+          "id": "P2-BASIC",
+          "label": "Part 2 기본",
+          "section": "LC Part 2",
+          "topic": "Part 2 기본 다지기",
+          "kind": "lesson"
+        },
+        {
+          "id": "P2-C1",
+          "label": "Part 2 Course 1",
+          "section": "LC Part 2",
+          "topic": "의문사 의문문",
+          "kind": "lesson"
+        },
+        {
+          "id": "P2-C2",
+          "label": "Part 2 Course 2",
+          "section": "LC Part 2",
+          "topic": "일반 의문문",
+          "kind": "lesson"
+        },
+        {
+          "id": "P2-C3",
+          "label": "Part 2 Course 3",
+          "section": "LC Part 2",
+          "topic": "선택·부가·평서문 등",
+          "kind": "lesson"
+        },
+        {
+          "id": "P2-TEST",
+          "label": "Part 2 Test",
+          "section": "LC Part 2",
+          "topic": "Part 2 Part Test",
+          "kind": "review"
+        },
+        {
+          "id": "P3-BASIC",
+          "label": "Part 3 기본",
+          "section": "LC Part 3",
+          "topic": "Part 3 기본 다지기",
+          "kind": "lesson"
+        },
+        {
+          "id": "P3-C1",
+          "label": "Part 3 Course 1",
+          "section": "LC Part 3",
+          "topic": "문제 유형별 공략",
+          "kind": "lesson"
+        },
+        {
+          "id": "P3-C2",
+          "label": "Part 3 Course 2",
+          "section": "LC Part 3",
+          "topic": "대화 상황별 공략",
+          "kind": "lesson"
+        },
+        {
+          "id": "P3-TEST",
+          "label": "Part 3 Test",
+          "section": "LC Part 3",
+          "topic": "Part 3 Part Test",
+          "kind": "review"
+        },
+        {
+          "id": "P4-BASIC",
+          "label": "Part 4 기본",
+          "section": "LC Part 4",
+          "topic": "Part 4 기본 다지기",
+          "kind": "lesson"
+        },
+        {
+          "id": "P4-C1",
+          "label": "Part 4 Course 1",
+          "section": "LC Part 4",
+          "topic": "문제 유형별 공략",
+          "kind": "lesson"
+        },
+        {
+          "id": "P4-C2",
+          "label": "Part 4 Course 2",
+          "section": "LC Part 4",
+          "topic": "지문 유형별 공략",
+          "kind": "lesson"
+        },
+        {
+          "id": "P4-TEST",
+          "label": "Part 4 Test",
+          "section": "LC Part 4",
+          "topic": "Part 4 Part Test",
+          "kind": "review"
+        },
+        {
+          "id": "TEST01",
+          "label": "실전모의고사 1",
+          "section": "실전",
+          "topic": "LC 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST02",
+          "label": "실전모의고사 2",
+          "section": "실전",
+          "topic": "LC 1회",
+          "kind": "practice_test"
+        }
+      ]
+    },
+    {
+      "id": "hackers-toeic-starter-rc",
+      "title": "해커스 토익 왕기초 RC Reading (리딩)",
+      "short": "왕기초 RC",
+      "publisher": "해커스어학연구소",
+      "isbn13": "9788965423300",
+      "page_count": 380,
+      "role": "starter",
+      "exam": "toeic",
+      "score_band": [
+        0,
+        449
+      ],
+      "structure": "기본기 2 + 4주×6일, 문법과 Part 7 해석을 짝지어 학습",
+      "source_url": "https://www.yes24.com/product/goods/81513355",
+      "unit_minutes": {
+        "lesson": 40,
+        "practice_test": 60,
+        "review": 30,
+        "appendix": 0
+      },
+      "units": [
+        {
+          "id": "BASIC-GR",
+          "label": "기본기 문법",
+          "section": "기본기",
+          "topic": "문법 기본기",
+          "kind": "lesson"
+        },
+        {
+          "id": "BASIC-RD",
+          "label": "기본기 리딩",
+          "section": "기본기",
+          "topic": "리딩 기본기",
+          "kind": "lesson"
+        },
+        {
+          "id": "W1-D1",
+          "label": "1주 1일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "주어·동사",
+          "kind": "lesson"
+        },
+        {
+          "id": "W1-D2",
+          "label": "1주 2일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "목적어·보어·수식어",
+          "kind": "lesson"
+        },
+        {
+          "id": "W1-D3",
+          "label": "1주 3일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "명사",
+          "kind": "lesson"
+        },
+        {
+          "id": "W1-D4",
+          "label": "1주 4일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "대명사",
+          "kind": "lesson"
+        },
+        {
+          "id": "W1-D5",
+          "label": "1주 5일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "형용사",
+          "kind": "lesson"
+        },
+        {
+          "id": "W1-D6",
+          "label": "1주 6일",
+          "section": "RC Part 7 지문 유형",
+          "topic": "이메일·편지·양식",
+          "kind": "lesson"
+        },
+        {
+          "id": "W2-D1",
+          "label": "2주 1일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "부사",
+          "kind": "lesson"
+        },
+        {
+          "id": "W2-D2",
+          "label": "2주 2일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "전치사",
+          "kind": "lesson"
+        },
+        {
+          "id": "W2-D3",
+          "label": "2주 3일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "접속사",
+          "kind": "lesson"
+        },
+        {
+          "id": "W2-D4",
+          "label": "2주 4일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "동사의 형태와 종류",
+          "kind": "lesson"
+        },
+        {
+          "id": "W2-D5",
+          "label": "2주 5일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "조동사",
+          "kind": "lesson"
+        },
+        {
+          "id": "W2-D6",
+          "label": "2주 6일",
+          "section": "RC Part 7 지문 유형",
+          "topic": "기사·메시지 대화문",
+          "kind": "lesson"
+        },
+        {
+          "id": "W3-D1",
+          "label": "3주 1일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "주어·동사 수일치",
+          "kind": "lesson"
+        },
+        {
+          "id": "W3-D2",
+          "label": "3주 2일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "시제",
+          "kind": "lesson"
+        },
+        {
+          "id": "W3-D3",
+          "label": "3주 3일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "능동태·수동태",
+          "kind": "lesson"
+        },
+        {
+          "id": "W3-D4",
+          "label": "3주 4일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "to 부정사",
+          "kind": "lesson"
+        },
+        {
+          "id": "W3-D5",
+          "label": "3주 5일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "동명사",
+          "kind": "lesson"
+        },
+        {
+          "id": "W3-D6",
+          "label": "3주 6일",
+          "section": "RC Part 7 지문 유형",
+          "topic": "광고·공고",
+          "kind": "lesson"
+        },
+        {
+          "id": "W4-D1",
+          "label": "4주 1일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "분사",
+          "kind": "lesson"
+        },
+        {
+          "id": "W4-D2",
+          "label": "4주 2일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "명사절",
+          "kind": "lesson"
+        },
+        {
+          "id": "W4-D3",
+          "label": "4주 3일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "부사절",
+          "kind": "lesson"
+        },
+        {
+          "id": "W4-D4",
+          "label": "4주 4일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "형용사절",
+          "kind": "lesson"
+        },
+        {
+          "id": "W4-D5",
+          "label": "4주 5일",
+          "section": "RC Part 5·6 문법 + Part 7 해석",
+          "topic": "비교 구문",
+          "kind": "lesson"
+        },
+        {
+          "id": "W4-D6",
+          "label": "4주 6일",
+          "section": "RC Part 7 지문 유형",
+          "topic": "안내문·회람",
+          "kind": "lesson"
+        }
+      ]
+    },
+    {
+      "id": "hackers-toeic-starter-lc",
+      "title": "해커스 토익 왕기초 LC Listening (리스닝)",
+      "short": "왕기초 LC",
+      "publisher": "해커스어학연구소",
+      "isbn13": "9788965423294",
+      "page_count": 308,
+      "role": "starter",
+      "exam": "toeic",
+      "score_band": [
+        0,
+        449
+      ],
+      "structure": "4주×5일: 듣기 기초 + Part 1~4를 한 주씩",
+      "source_url": "https://www.yes24.com/product/goods/81513323",
+      "unit_minutes": {
+        "lesson": 35,
+        "practice_test": 45,
+        "review": 30,
+        "appendix": 0
+      },
+      "units": [
+        {
+          "id": "W1-D1",
+          "label": "1주 1일",
+          "section": "LC 기초",
+          "topic": "발음 구분·연음",
+          "kind": "lesson"
+        },
+        {
+          "id": "W1-D2",
+          "label": "1주 2일",
+          "section": "LC 기초",
+          "topic": "시제·태",
+          "kind": "lesson"
+        },
+        {
+          "id": "W1-D3",
+          "label": "1주 3일",
+          "section": "LC Part 1",
+          "topic": "사람 동작·상태 표현",
+          "kind": "lesson"
+        },
+        {
+          "id": "W1-D4",
+          "label": "1주 4일",
+          "section": "LC Part 1",
+          "topic": "사물·풍경 위치 표현",
+          "kind": "lesson"
+        },
+        {
+          "id": "W1-D5",
+          "label": "1주 5일",
+          "section": "LC Part 1",
+          "topic": "Part 1 유형별 공략",
+          "kind": "lesson"
+        },
+        {
+          "id": "W2-D1",
+          "label": "2주 1일",
+          "section": "LC Part 2",
+          "topic": "혼동 어휘 1",
+          "kind": "lesson"
+        },
+        {
+          "id": "W2-D2",
+          "label": "2주 2일",
+          "section": "LC Part 2",
+          "topic": "혼동 어휘 2",
+          "kind": "lesson"
+        },
+        {
+          "id": "W2-D3",
+          "label": "2주 3일",
+          "section": "LC Part 2",
+          "topic": "직접 응답 표현",
+          "kind": "lesson"
+        },
+        {
+          "id": "W2-D4",
+          "label": "2주 4일",
+          "section": "LC Part 2",
+          "topic": "간접 응답 표현",
+          "kind": "lesson"
+        },
+        {
+          "id": "W2-D5",
+          "label": "2주 5일",
+          "section": "LC Part 2",
+          "topic": "Part 2 유형별 공략",
+          "kind": "lesson"
+        },
+        {
+          "id": "W3-D1",
+          "label": "3주 1일",
+          "section": "LC Part 3",
+          "topic": "긴 문장 끊어 듣기",
+          "kind": "lesson"
+        },
+        {
+          "id": "W3-D2",
+          "label": "3주 2일",
+          "section": "LC Part 3",
+          "topic": "시간·순서·제안 표현",
+          "kind": "lesson"
+        },
+        {
+          "id": "W3-D3",
+          "label": "3주 3일",
+          "section": "LC Part 3",
+          "topic": "회사 생활 표현",
+          "kind": "lesson"
+        },
+        {
+          "id": "W3-D4",
+          "label": "3주 4일",
+          "section": "LC Part 3",
+          "topic": "일상 생활 표현",
+          "kind": "lesson"
+        },
+        {
+          "id": "W3-D5",
+          "label": "3주 5일",
+          "section": "LC Part 3",
+          "topic": "Part 3 유형별 공략",
+          "kind": "lesson"
+        },
+        {
+          "id": "W4-D1",
+          "label": "4주 1일",
+          "section": "LC Part 4",
+          "topic": "긴 문장 끊어 듣기",
+          "kind": "lesson"
+        },
+        {
+          "id": "W4-D2",
+          "label": "4주 2일",
+          "section": "LC Part 4",
+          "topic": "패러프레이징",
+          "kind": "lesson"
+        },
+        {
+          "id": "W4-D3",
+          "label": "4주 3일",
+          "section": "LC Part 4",
+          "topic": "메시지·연설 표현",
+          "kind": "lesson"
+        },
+        {
+          "id": "W4-D4",
+          "label": "4주 4일",
+          "section": "LC Part 4",
+          "topic": "안내·공지·방송 표현",
+          "kind": "lesson"
+        },
+        {
+          "id": "W4-D5",
+          "label": "4주 5일",
+          "section": "LC Part 4",
+          "topic": "Part 4 유형별 공략",
+          "kind": "lesson"
+        }
+      ]
+    },
+    {
+      "id": "ets-toeic-1000-v5-rc",
+      "title": "ETS 토익 정기시험 기출문제집 1000 Vol. 5 RC",
+      "short": "ETS 1000 RC",
+      "publisher": "YBM(와이비엠)",
+      "isbn13": "9788917243802",
+      "page_count": 544,
+      "role": "practice",
+      "exam": "toeic",
+      "score_band": [
+        0,
+        990
+      ],
+      "structure": "RC 기출 TEST 10회",
+      "source_url": "https://www.yes24.com/product/goods/168776448",
+      "unit_minutes": {
+        "lesson": 40,
+        "practice_test": 75,
+        "review": 30,
+        "appendix": 0
+      },
+      "units": [
+        {
+          "id": "TEST01",
+          "label": "TEST 01",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST02",
+          "label": "TEST 02",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST03",
+          "label": "TEST 03",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST04",
+          "label": "TEST 04",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST05",
+          "label": "TEST 05",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST06",
+          "label": "TEST 06",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST07",
+          "label": "TEST 07",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST08",
+          "label": "TEST 08",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST09",
+          "label": "TEST 09",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST10",
+          "label": "TEST 10",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        }
+      ]
+    },
+    {
+      "id": "ets-toeic-1000-v5-lc",
+      "title": "ETS 토익 정기시험 기출문제집 1000 Vol. 5 LC",
+      "short": "ETS 1000 LC",
+      "publisher": "YBM(와이비엠)",
+      "isbn13": "9788917243796",
+      "page_count": 460,
+      "role": "practice",
+      "exam": "toeic",
+      "score_band": [
+        0,
+        990
+      ],
+      "structure": "LC 기출 TEST 10회",
+      "source_url": "https://www.yes24.com/product/goods/168776455",
+      "unit_minutes": {
+        "lesson": 40,
+        "practice_test": 45,
+        "review": 30,
+        "appendix": 0
+      },
+      "units": [
+        {
+          "id": "TEST01",
+          "label": "TEST 01",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST02",
+          "label": "TEST 02",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST03",
+          "label": "TEST 03",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST04",
+          "label": "TEST 04",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST05",
+          "label": "TEST 05",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST06",
+          "label": "TEST 06",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST07",
+          "label": "TEST 07",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST08",
+          "label": "TEST 08",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST09",
+          "label": "TEST 09",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST10",
+          "label": "TEST 10",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        }
+      ]
+    },
+    {
+      "id": "hackers-toeic-1000-v1-rc",
+      "title": "해커스 토익 실전 1000제 1 RC Reading (리딩) 문제집",
+      "short": "실전 1000제 RC",
+      "publisher": "해커스어학연구소",
+      "isbn13": "9788965425052",
+      "page_count": 420,
+      "role": "practice",
+      "exam": "toeic",
+      "score_band": [
+        0,
+        990
+      ],
+      "structure": "RC 실전 TEST 10회",
+      "source_url": "https://www.yes24.com/product/goods/116072450",
+      "unit_minutes": {
+        "lesson": 40,
+        "practice_test": 75,
+        "review": 30,
+        "appendix": 0
+      },
+      "units": [
+        {
+          "id": "TEST01",
+          "label": "TEST 01",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST02",
+          "label": "TEST 02",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST03",
+          "label": "TEST 03",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST04",
+          "label": "TEST 04",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST05",
+          "label": "TEST 05",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST06",
+          "label": "TEST 06",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST07",
+          "label": "TEST 07",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST08",
+          "label": "TEST 08",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST09",
+          "label": "TEST 09",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        },
+        {
+          "id": "TEST10",
+          "label": "TEST 10",
+          "section": "실전",
+          "topic": "모의고사 1회",
+          "kind": "practice_test"
+        }
+      ]
+    }
+  ]
+}

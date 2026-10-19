@@ -490,6 +490,14 @@ async def generate_milestones(
         saved = await first_plan_adapter.fetch_confirmed_milestones(session, goal_id=goal_id)
         if saved:
             return MilestoneListResponse(milestones=saved, ai_source="saved")
+    # 교재 카드를 확정한 목표는 그 책의 단원 단계가 곧 뼈대다 — LLM 을 부르지 않는다.
+    # 주기 길이를 같이 넘기는 이유: 단계 수를 주기 수의 배수로 잡아야 주기마다 고르게 나뉜다
+    # (`curriculum_plan.phase_count_for`).
+    curriculum = first_plan_milestones.curriculum_milestones(
+        outcome, cycle_weeks=await _max_plan_weeks(session, user.id, outcome)
+    )
+    if curriculum is not None:
+        return MilestoneListResponse(milestones=curriculum, ai_source="rule")
     # `body.density` 를 안 넘긴다 — 마일스톤 크기는 `total_capacity`(인터뷰 답)가 정하고
     # density 파생 변수는 이 프롬프트에 등장하지 않는다(`generate_milestones` docstring).
     milestones, fell_back = await first_plan_milestones.generate_milestones(
