@@ -1,6 +1,10 @@
 # ADR-0010: 자료 조사 파이프라인 — 그라운딩 인용에서 API 검색으로
 
 - 상태: 제안 (2026-09-03)
+- 갱신(2026-10-21): 도서 소스를 **알라딘 → 국립중앙도서관 ISBN 서지정보**로 교체했다. 알라딘
+  Open API 가 2026-10-30 종료되기 때문이다(신규 키 발급은 2026-09-04 종료). 아래 본문의 '알라딘'
+  은 당시 결정의 기록으로 남긴다 — 지금 배선은 `integrations/nl_seoji` 한 키가 검색·쪽수·목차를 다 한다
+  (api-change-log v2.38).
 - 관련: #259 (자료 검색 3단계 HITL), [`docs/experiments/l0-materials-source-results.md`](../experiments/l0-materials-source-results.md)
   (L0 실측, 2026-09-01), ADR-0003 (LLM Tool Executor)
 - 구현(이 ADR 범위): `agents/study_method_agent.py` · `prompts/planning/study_method.v1.md` ·

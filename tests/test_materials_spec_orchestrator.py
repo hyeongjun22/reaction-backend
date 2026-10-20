@@ -1,7 +1,7 @@
 """materials_spec 오케스트레이터 (ADR-0010 §1 ③) — 도서(필수+best-effort 합성)·영상(필수)
 상세 조합, 진도 계산(`compute_book_pace`), `spec_slot_value` 직렬화.
 
-클라이언트는 stub 한다(각 클라이언트 자체는 `test_aladin_client.py`·`test_seoji_client.py`·
+클라이언트는 stub 한다(각 클라이언트 자체는 `test_seoji_client.py`·
 `test_youtube_client.py` 가 이미 검증했다).
 """
 
@@ -12,7 +12,6 @@ from datetime import date
 import pytest
 
 from reaction_backend.config import get_settings
-from reaction_backend.integrations.aladin import client as aladin_client
 from reaction_backend.integrations.nl_seoji import client as seoji_client
 from reaction_backend.integrations.youtube import client as youtube_client
 from reaction_backend.orchestrator import materials_spec
@@ -27,22 +26,28 @@ from tests.test_interview_adapter_materials_spec import _outcome_with_one_goal
 
 
 async def _ok_lookup(
-    *, title: str = "책 제목", author: str = "저자", pages: int = 500
-) -> aladin_client.LookupResult:
-    return aladin_client.LookupResult(
-        lookup=aladin_client.BookLookup(title=title, author=author, page_count=pages)
-    )
-
-
-async def _ok_toc() -> seoji_client.TocResult:
-    return seoji_client.TocResult(
-        lookup=seoji_client.TocLookup(
-            chapters=[
-                seoji_client.TocChapter(title="Chapter 1. 서론", end_page=30),
-                seoji_client.TocChapter(title="Chapter 2. 본론", end_page=80),
-            ]
+    *,
+    title: str = "책 제목",
+    author: str = "저자",
+    pages: int = 500,
+    chapters: list[seoji_client.TocChapter] | None = None,
+) -> seoji_client.LookupResult:
+    return seoji_client.LookupResult(
+        lookup=seoji_client.BookLookup(
+            title=title,
+            author=author,
+            publisher="출판사",
+            isbn13="9788994492049",
+            page_count=pages,
+            chapters=chapters or [],
         )
     )
+
+
+_TWO_CHAPTERS = [
+    seoji_client.TocChapter(title="Chapter 1. 서론", end_page=30),
+    seoji_client.TocChapter(title="Chapter 2. 본론", end_page=80),
+]
 
 
 async def _ok_playlist_detail(
@@ -62,9 +67,14 @@ async def _ok_playlist_detail(
 # ─────────────────────────── book_detail ───────────────────────────
 
 
-async def test_book_detail_combines_pages_and_toc(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(aladin_client, "lookup_book", lambda *a, **k: _ok_lookup(pages=1000))
-    monkeypatch.setattr(seoji_client, "lookup_toc", lambda *a, **k: _ok_toc())
+async def test_book_detail_takes_pages_and_toc_from_one_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        seoji_client,
+        "lookup_book",
+        lambda *a, **k: _ok_lookup(pages=1000, chapters=_TWO_CHAPTERS),
+    )
 
     result = await materials_spec.book_detail("9788994492049", settings=get_settings())
 
@@ -82,19 +92,12 @@ async def test_book_detail_caps_a_very_long_toc_instead_of_failing(
     """하루 한 단원짜리 단어책은 목차가 100개를 넘는다 — 넘친 채로 응답을 만들면 검증에서
     터져 도서 상세 전체가 500 이 됐다(inbox-5). 상한까지만 담고 나머지는 진도 계산의
     '목차 이후 나머지 분량' 이 받는다."""
-
-    async def _long_toc() -> seoji_client.TocResult:
-        return seoji_client.TocResult(
-            lookup=seoji_client.TocLookup(
-                chapters=[
-                    seoji_client.TocChapter(title=f"DAY {i:03d}", end_page=i * 2)
-                    for i in range(1, 151)
-                ]
-            )
-        )
-
-    monkeypatch.setattr(aladin_client, "lookup_book", lambda *a, **k: _ok_lookup(pages=320))
-    monkeypatch.setattr(seoji_client, "lookup_toc", lambda *a, **k: _long_toc())
+    long_toc = [
+        seoji_client.TocChapter(title=f"DAY {i:03d}", end_page=i * 2) for i in range(1, 151)
+    ]
+    monkeypatch.setattr(
+        seoji_client, "lookup_book", lambda *a, **k: _ok_lookup(pages=320, chapters=long_toc)
+    )
 
     result = await materials_spec.book_detail("9788994492049", settings=get_settings())
 
@@ -105,13 +108,8 @@ async def test_book_detail_caps_a_very_long_toc_instead_of_failing(
 
 
 async def test_book_detail_missing_toc_is_not_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    """L0 실측: 10권 중 9권이 이 경로다 — 페이지 수만으로도 `detail` 은 채워진다."""
-
-    async def _no_toc(*a: object, **k: object) -> seoji_client.TocResult:
-        return seoji_client.TocResult(reason=seoji_client.REASON_NO_TOC)
-
-    monkeypatch.setattr(aladin_client, "lookup_book", lambda *a, **k: _ok_lookup(pages=816))
-    monkeypatch.setattr(seoji_client, "lookup_toc", _no_toc)
+    """L0 실측: 10권 중 9권이 이 경로다 — 쪽수만으로도 `detail` 은 채워지고 안내도 없다."""
+    monkeypatch.setattr(seoji_client, "lookup_book", lambda *a, **k: _ok_lookup(pages=816))
 
     result = await materials_spec.book_detail("9788965424765", settings=get_settings())
 
@@ -119,34 +117,26 @@ async def test_book_detail_missing_toc_is_not_an_error(monkeypatch: pytest.Monke
     assert result.detail.page_count == 816
     assert result.detail.chapters == []
     assert result.detail.toc_source is None
-    # `no_toc` 는 정상 경로라 안내하지 않는다 — 다른 실패 사유와 다르다.
     assert result.notice is None
 
 
-async def test_book_detail_toc_lookup_failure_is_still_usable_but_notices(
+async def test_book_detail_without_a_page_count_is_usable_but_says_so(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """seoji 가 타임아웃 등으로 진짜 실패하면(=NO_TOC 가 아니면) 알려준다 — 페이지 수는
-    있으니 책 자체는 여전히 쓸 수 있다."""
-
-    async def _timeout(*a: object, **k: object) -> seoji_client.TocResult:
-        return seoji_client.TocResult(reason=seoji_client.REASON_TIMEOUT)
-
-    monkeypatch.setattr(aladin_client, "lookup_book", lambda *a, **k: _ok_lookup())
-    monkeypatch.setattr(seoji_client, "lookup_toc", _timeout)
+    """쪽수 표기가 없거나 못 읽으면(세트 행 "1" 등) 진도는 못 내지만 책은 확정할 수 있다."""
+    monkeypatch.setattr(seoji_client, "lookup_book", lambda *a, **k: _ok_lookup(pages=0))
 
     result = await materials_spec.book_detail("9788965424765", settings=get_settings())
 
-    assert result.detail is not None
-    assert result.notice is not None
-    assert "목차" in result.notice
+    assert result.detail is not None and result.detail.page_count == 0
+    assert result.notice is not None and "쪽수" in result.notice
 
 
-async def test_book_detail_aladin_failure_yields_no_detail(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _fail(*a: object, **k: object) -> aladin_client.LookupResult:
-        return aladin_client.LookupResult(reason=aladin_client.REASON_NOT_FOUND)
+async def test_book_detail_lookup_failure_yields_no_detail(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _fail(*a: object, **k: object) -> seoji_client.LookupResult:
+        return seoji_client.LookupResult(reason=seoji_client.REASON_NOT_FOUND)
 
-    monkeypatch.setattr(aladin_client, "lookup_book", _fail)
+    monkeypatch.setattr(seoji_client, "lookup_book", _fail)
 
     result = await materials_spec.book_detail("0000000000000", settings=get_settings())
 

@@ -1,7 +1,7 @@
 """자료 상세 확정 — 목차(best-effort)/분량/진도 (ADR-0010 §1 ③).
 
-LLM 을 호출하지 않는다. 도서는 알라딘(페이지 수, 필수) + 국중 seoji(목차, best-effort)를
-합치고, 영상은 YouTube 재생목록 상세(커리큘럼+분량, 필수) 하나만 부른다.
+LLM 을 호출하지 않는다. 도서는 국립중앙도서관 ISBN 조회 한 번(쪽수 + 목차 best-effort)이고
+(알라딘은 2026-10-30 종료로 걷어냈다), 영상은 YouTube 재생목록 상세(커리큘럼+분량, 필수) 하나만 부른다.
 
 `compute_book_pace` 가 "목차를 가져와서 하루에 얼마나 볼지 페이지로 알려주는" 실질이다 —
 `page_count` 만으로 **항상**(L0 10/10) 세션당 권장 페이지를 계산한다. 목차 전 챕터에
@@ -26,7 +26,6 @@ from typing import Any, Literal
 
 from reaction_backend.config import Settings
 from reaction_backend.domain import slot_value as sv
-from reaction_backend.integrations.aladin import client as aladin_client
 from reaction_backend.integrations.nl_seoji import client as seoji_client
 from reaction_backend.integrations.youtube import client as youtube_client
 from reaction_backend.orchestrator import first_plan_adapter
@@ -43,11 +42,11 @@ from reaction_backend.schemas.materials_spec import (
     VideoSpecItem,
 )
 
-_ALADIN_LOOKUP_NOTICE: dict[str, str] = {
-    aladin_client.REASON_NO_KEY: "지금은 도서 상세 조회를 쓸 수 없어요.",
-    aladin_client.REASON_TIMEOUT: "도서 정보를 가져오는 데 시간이 걸리고 있어요. 다시 시도해 주세요.",
-    aladin_client.REASON_UNAVAILABLE: "지금은 도서 정보를 가져올 수 없어요. 잠시 후 다시 시도해 주세요.",
-    aladin_client.REASON_NOT_FOUND: "이 도서 정보를 찾지 못했어요.",
+_BOOK_LOOKUP_NOTICE: dict[str, str] = {
+    seoji_client.REASON_NO_KEY: "지금은 도서 상세 조회를 쓸 수 없어요.",
+    seoji_client.REASON_TIMEOUT: "도서 정보를 가져오는 데 시간이 걸리고 있어요. 다시 시도해 주세요.",
+    seoji_client.REASON_UNAVAILABLE: "지금은 도서 정보를 가져올 수 없어요. 잠시 후 다시 시도해 주세요.",
+    seoji_client.REASON_NOT_FOUND: "이 도서 정보를 찾지 못했어요.",
 }
 _YOUTUBE_DETAIL_NOTICE: dict[str, str] = {
     youtube_client.REASON_NO_KEY: "지금은 영상 상세 조회를 쓸 수 없어요.",
@@ -57,49 +56,43 @@ _YOUTUBE_DETAIL_NOTICE: dict[str, str] = {
     youtube_client.REASON_NOT_FOUND: "이 재생목록을 찾지 못했어요. 비공개로 전환됐을 수 있어요.",
 }
 _FALLBACK_NOTICE = "지금은 정보를 가져올 수 없어요. 잠시 후 다시 시도해 주세요."
-_NO_TOC_NOTICE = "이 책은 목차 정보가 없어요. 페이지 수만으로 계획에 반영돼요."
+_NO_PAGES_NOTICE = "이 책은 쪽수 정보가 없어요. 하루 분량은 계산하지 못하지만 자료로는 반영돼요."
 
 
 async def book_detail(isbn13: str, *, settings: Settings) -> BookDetailResponse:
-    """도서 상세 — 페이지 수는 필수, 목차(+페이지 체크포인트)는 best-effort(L0 실측
-    10권 중 1권). 진도(`BookPace`)는 여기서 계산하지 않는다 — 목표의 시간 예산이 있어야
-    하는데 이 endpoint 는 목표 맥락을 안 받는다(`confirm_spec` 이 계산한다)."""
-    lookup = await aladin_client.lookup_book(isbn13, key=settings.aladin_ttb_key)
-    if not lookup.ok:
+    """도서 상세 — 국립중앙도서관 ISBN 조회 한 번으로 쪽수와 목차(best-effort)를 함께 받는다.
+
+    예전엔 알라딘(쪽수)·seoji(목차)를 두 번 불렀다. 알라딘이 2026-10-30 에 끝나 seoji 한
+    번으로 합쳤다 — 같은 응답에 둘 다 있다. 목차가 없는 건 정상이다(판본 대부분). 쪽수를
+    모르면(`page_count=0`) 진도는 못 내지만 책 자체는 확정할 수 있다 — 그 사실만 알린다.
+
+    진도(`BookPace`)는 여기서 계산하지 않는다 — 목표의 시간 예산이 있어야 하는데 이
+    endpoint 는 목표 맥락을 안 받는다(`confirm_spec` 이 계산한다).
+    """
+    result = await seoji_client.lookup_book(isbn13, key=settings.nl_seoji_key)
+    if not result.ok:
         return BookDetailResponse(
-            notice=_ALADIN_LOOKUP_NOTICE.get(lookup.reason or "", _FALLBACK_NOTICE)
+            notice=_BOOK_LOOKUP_NOTICE.get(result.reason or "", _FALLBACK_NOTICE)
         )
-    assert lookup.lookup is not None  # `ok` 가 보장
-
-    toc_result = await seoji_client.lookup_toc(isbn13, key=settings.nl_seoji_key)
-    chapters: list[BookChapter] = []
-    toc_source: Literal["seoji"] | None = None
-    notice: str | None = None
-    if toc_result.ok:
-        assert toc_result.lookup is not None
-        # 스키마 상한(`MAX_TOC_ENTRIES`)까지만 — 하루 한 단원짜리 단어책은 목차 항목이 100개를
-        # 쉽게 넘는다. 넘긴 채로 응답을 만들면 검증에서 터져 도서 상세 전체가 500 이 됐다
-        # (inbox-5). 잘린 뒤쪽 분량은 진도 계산의 "목차 이후 나머지 분량" 항목이 받는다.
-        chapters = [
-            BookChapter(title=c.title, end_page=c.end_page)
-            for c in toc_result.lookup.chapters[:MAX_TOC_ENTRIES]
-        ]
-        toc_source = "seoji"
-    elif toc_result.reason != seoji_client.REASON_NO_TOC:
-        # `REASON_NO_TOC` 는 정상 경로(90%) 라 안내하지 않는다. 그 외(키 없음·타임아웃 등)만
-        # "목차를 못 가져왔다" 는 사실을 알린다 — 페이지 수는 있으니 책 자체는 쓸 수 있다.
-        notice = _NO_TOC_NOTICE
-
+    assert result.lookup is not None  # `ok` 가 보장
+    book = result.lookup
+    # 스키마 상한(`MAX_TOC_ENTRIES`)까지만 — 하루 한 단원짜리 단어책은 목차 항목이 100개를
+    # 쉽게 넘는다. 넘긴 채로 응답을 만들면 검증에서 터져 도서 상세 전체가 500 이 됐다
+    # (inbox-5). 잘린 뒤쪽 분량은 진도 계산의 "목차 이후 나머지 분량" 항목이 받는다.
+    chapters = [
+        BookChapter(title=c.title, end_page=c.end_page) for c in book.chapters[:MAX_TOC_ENTRIES]
+    ]
+    toc_source: Literal["seoji"] | None = "seoji" if chapters else None
     return BookDetailResponse(
         detail=BookSpecDetail(
-            title=lookup.lookup.title,
-            author=lookup.lookup.author,
+            title=book.title,
+            author=book.author,
             isbn13=isbn13,
-            page_count=lookup.lookup.page_count,
+            page_count=book.page_count,
             chapters=chapters,
             toc_source=toc_source,
         ),
-        notice=notice,
+        notice=None if book.page_count > 0 else _NO_PAGES_NOTICE,
     )
 
 

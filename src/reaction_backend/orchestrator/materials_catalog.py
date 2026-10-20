@@ -1,14 +1,18 @@
-"""자료 검색 카탈로그 — 알라딘/YouTube 후보 병행 조회 (ADR-0010 §1 ②).
+"""자료 검색 카탈로그 — 도서(국립중앙도서관)/YouTube 후보 병행 조회 (ADR-0010 §1 ②).
 
 LLM 을 호출하지 않는다 — 사용자가 확인한 검색어로 실제 API 를 두드려 후보를 모을 뿐이다.
 두 소스는 **독립적으로** 실패할 수 있다(키 없음·쿼터 초과·네트워크) — 한쪽이 죽어도 다른
 쪽 결과는 그대로 낸다. 부분 성공을 실패로 뭉개지 않는다.
+
+도서는 원래 알라딘 Open API 였다. 알라딘이 2026-10-30 에 서비스를 끝내 국립중앙도서관 ISBN
+서지정보 API 로 바꿨다(`integrations/nl_seoji`) — 판매 순위 대신 최신 발행순이고, 후보마다
+쪽수가 함께 온다.
 """
 
 from __future__ import annotations
 
 from reaction_backend.config import get_settings
-from reaction_backend.integrations.aladin import client as aladin_client
+from reaction_backend.integrations.nl_seoji import client as seoji_client
 from reaction_backend.integrations.youtube import client as youtube_client
 from reaction_backend.schemas.materials_catalog import (
     MAX_CANDIDATES,
@@ -17,11 +21,11 @@ from reaction_backend.schemas.materials_catalog import (
     VideoCandidate,
 )
 
-_ALADIN_NOTICE: dict[str, str] = {
-    aladin_client.REASON_NO_KEY: "지금은 도서 검색을 쓸 수 없어요.",
-    aladin_client.REASON_TIMEOUT: "도서 검색이 제때 응답하지 않았어요. 다시 시도해 주세요.",
-    aladin_client.REASON_UNAVAILABLE: "지금은 도서 검색이 잘 되지 않네요. 잠시 후 다시 시도해 주세요.",
-    aladin_client.REASON_EMPTY: "이 검색어로는 도서를 찾지 못했어요. 검색어를 바꿔 보세요.",
+_BOOK_NOTICE: dict[str, str] = {
+    seoji_client.REASON_NO_KEY: "지금은 도서 검색을 쓸 수 없어요.",
+    seoji_client.REASON_TIMEOUT: "도서 검색이 제때 응답하지 않았어요. 다시 시도해 주세요.",
+    seoji_client.REASON_UNAVAILABLE: "지금은 도서 검색이 잘 되지 않네요. 잠시 후 다시 시도해 주세요.",
+    seoji_client.REASON_EMPTY: "이 검색어로는 도서를 찾지 못했어요. 책 제목에 들어가는 낱말로 바꿔 보세요.",
 }
 _YOUTUBE_NOTICE: dict[str, str] = {
     youtube_client.REASON_NO_KEY: "지금은 영상 검색을 쓸 수 없어요.",
@@ -41,8 +45,8 @@ async def search(*, book_query: str | None, video_query: str | None) -> Material
     books: list[BookCandidate] = []
     book_notice: str | None = None
     if book_query:
-        result = await aladin_client.search_books(
-            book_query, key=settings.aladin_ttb_key, limit=MAX_CANDIDATES
+        result = await seoji_client.search_books(
+            book_query, key=settings.nl_seoji_key, limit=MAX_CANDIDATES
         )
         if result.ok:
             books = [
@@ -52,12 +56,13 @@ async def search(*, book_query: str | None, video_query: str | None) -> Material
                     publisher=b.publisher,
                     isbn13=b.isbn13,
                     cover_url=b.cover_url,
-                    link_url=b.link_url,
+                    link_url="",
+                    page_count=b.page_count or None,
                 )
                 for b in result.books
             ]
         else:
-            book_notice = _ALADIN_NOTICE.get(result.reason or "", _FALLBACK_NOTICE)
+            book_notice = _BOOK_NOTICE.get(result.reason or "", _FALLBACK_NOTICE)
 
     videos: list[VideoCandidate] = []
     video_notice: str | None = None

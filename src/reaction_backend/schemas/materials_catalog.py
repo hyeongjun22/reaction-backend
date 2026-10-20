@@ -1,4 +1,4 @@
-"""자료 검색 카탈로그 — 알라딘/YouTube 후보 스키마 (ADR-0010 §1 ②).
+"""자료 검색 카탈로그 — 도서(국립중앙도서관)/YouTube 후보 스키마 (ADR-0010 §1 ②).
 
 LLM 산출물이 아니라 순수 검색 API 결과라 `DraftMixin` 을 쓰지 않는다 — 그 mixin 은 "AI 가
 만들어낸 것이라 accept/edit/reject 이 필요한" 단일 산출물용이다(`MaterialsSearchResponse`
@@ -21,14 +21,18 @@ MAX_QUERY_CHARS = 100
 
 
 class BookCandidate(CamelModel):
-    """알라딘 검색 후보 1건."""
+    """도서 검색 후보 1건 — 국립중앙도서관 ISBN 서지정보(알라딘 종료로 교체, v2.38)."""
 
     title: str
     author: str
     publisher: str
     isbn13: str
     cover_url: str
+    """표지 이미지 — 이 소스는 대개 비워 두므로 빈 문자열이 흔하다."""
     link_url: str
+    """서점 상품 페이지 — 이 소스엔 없어 빈 문자열이다(알라딘 시절 필드, 하위호환으로 남김)."""
+    page_count: int | None = None
+    """쪽수 — 후보 단계에서 이미 안다. 모르면 `null`(세트·낱장 표기 등)."""
 
 
 class VideoCandidate(CamelModel):
