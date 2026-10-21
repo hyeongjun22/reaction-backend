@@ -25,11 +25,12 @@ from __future__ import annotations
 
 import math
 import re
+import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 from reaction_backend.domain import curriculum as cur
-from reaction_backend.schemas.interview import GoalCandidate
+from reaction_backend.schemas.interview import GoalCandidate, MaterialItem
 from reaction_backend.schemas.planning import (
     ActionItemDraft,
     GoalDecomposition,
@@ -41,6 +42,7 @@ __all__ = [
     "CurriculumPlan",
     "Recommendation",
     "books_for",
+    "books_from_materials",
     "card_spec_item",
     "decomposition",
     "milestones",
@@ -48,6 +50,8 @@ __all__ = [
     "recommend",
 ]
 
+# 한 번 집중 길이를 모를 때의 기본값(`first_plan_adapter._DEFAULT_SESSION_MIN` 과 같은 값).
+_DEFAULT_SESSION_MINUTES = 50
 # 마일스톤 상한(MilestonePlan max_length=6)에서 실전 모의고사 단계 1칸을 남긴다.
 _MAX_LESSON_PHASES = 5
 # goal_nodes.title 은 String(200).
@@ -57,11 +61,249 @@ _MIN_CARD_MINUTES = 10
 _MAX_CARD_MINUTES = 240
 
 
-def books_for(goal: GoalCandidate | None) -> list[cur.Book]:
-    """목표에 확정된 교재 카드 — 카드 목록에서 없어진 id 는 조용히 건너뛴다(그 책만 빠진다)."""
+def books_for(
+    goal: GoalCandidate | None, *, session_minutes: int = _DEFAULT_SESSION_MINUTES
+) -> list[cur.Book]:
+    """목표에 확정된, 단원 구조가 있는 자료 — 교재 카드 + 목차 있는 도서·재생목록.
+
+    카드 목록에서 없어진 id 는 조용히 건너뛴다(그 책만 빠진다). `session_minutes` 는 확정 자료의
+    단원 분량과 긴 단원 나누기에 쓴다(`books_from_materials`) — 나누면 단원 개수가 바뀌므로
+    마일스톤(Stage A)과 계획(Stage B)이 같은 값(`session_min_for(outcome)`)을 넘겨야 단계가 맞는다.
+    """
     if goal is None:
         return []
-    return [b for b in (cur.book(i) for i in goal.curriculum) if b is not None]
+    cards = [b for b in (cur.book(i) for i in goal.curriculum) if b is not None]
+    return cards + books_from_materials(goal.material_items, session_minutes=session_minutes)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 확정 자료(목차 있는 도서 · 재생목록) → 단원 구조
+# ─────────────────────────────────────────────────────────────────────────────
+
+# 쪽당 공부 시간(분) — 확정 때 세션당 권장 쪽수(`pages_per_session`)가 없을 때만 쓰는 추정치
+# (읽고 예제를 풀어 보는 속도). 있으면 그 진도를 그대로 따른다 — 사용자가 확정 화면에서 본 값이다.
+_DEFAULT_MINUTES_PER_PAGE = 2.0
+# 쪽수도 모르는 장(章)의 분량.
+_UNKNOWN_CHAPTER_MINUTES = 40
+# 재생 길이를 모르는 영상의 분량.
+_UNKNOWN_VIDEO_MINUTES = 30
+_MIN_UNIT_MINUTES = 10
+_SHORT_NAME_MAX = 14
+_TOPIC_MAX = 24
+# 목차 항목 머리의 장 표기 — "Chapter 3. 연산자" → ("Chapter 3", "연산자"), "제2장 변수" →
+# ("제2장", "변수"). "3. 연산자" 처럼 번호만 있으면 "3장" 으로 적는다(`_NUMBERED_RE`).
+_CHAPTER_HEAD_RE = re.compile(
+    r"^\s*((?:Chapter|CHAPTER|Part|PART|DAY|Day|Unit|UNIT|Lesson)\s*\.?\s*\d+"
+    r"|제?\s*\d+\s*(?:장|강|부|과|주차|일차))\s*[.:)\-–]?\s*(.*)$"
+)
+_NUMBERED_RE = re.compile(r"^\s*(\d+)\s*[.)]\s+(.+)$")
+# `materials_spec._TOC_TAIL_LABEL` — 목차가 다 못 담은 뒤쪽 쪽수를 받는 항목.
+_TOC_TAIL_MARK = "목차 이후"
+# 재생목록 제목에서 공통 머리·꼬리를 자를 때 끊어도 되는 자리.
+_TITLE_BOUNDARY = " [](){}<>|:-–·,/"
+# 영상 제목의 대괄호 — 꼬리표("[해커스]")든 주제("[1일차 시제]")든 벗겨서 낱말 경계로만 쓴다.
+_SQUARE_RE = re.compile(r"[\[\]【】]")
+# 영상 주제 머리의 강 번호 — 단원 표기("N강")와 같으면 뗀다("1강 · 1강 - 시제" 가 되지 않게).
+_LECTURE_NO_RE = re.compile(r"^(\d+)\s*강(?=[\s\-–:.]|$)")
+# 자료 이름에서 지울 꾸밈 — 괄호 속 부제("(토익은 역시 1위 해커스토익)")와 이모지·기호.
+_BRACKETED_RE = re.compile(r"\([^)]*\)|\[[^\]]*\]|【[^】]*】")
+_DECORATION_RE = re.compile(r"[^\w\s+.&·\-]")
+
+
+def _short_name(title: str) -> str:
+    """세션 제목 머리말 — 괄호 부제·이모지를 떼고 14자 안쪽(낱말 경계)으로 줄인다."""
+    name = " ".join(_DECORATION_RE.sub("", _BRACKETED_RE.sub("", title)).split())
+    if not name:  # 제목 전체가 괄호였다 — 괄호만 벗긴다
+        name = " ".join(_DECORATION_RE.sub("", title).split())
+    if len(name) > _SHORT_NAME_MAX:
+        cut = name[: _SHORT_NAME_MAX + 1].rfind(" ")
+        name = name[:cut] if cut >= _SHORT_NAME_MAX // 2 else name[:_SHORT_NAME_MAX]
+    return name.strip() or "자료"
+
+
+def _common_prefix_len(a: str, b: str) -> int:
+    n = 0
+    for x, y in zip(a, b, strict=False):
+        if x != y:
+            break
+        n += 1
+    return n
+
+
+def _shared_head(a: str, b: str) -> int:
+    """a·b 의 공통 머리 길이 — 낱말 경계(`_TITLE_BOUNDARY`)까지만. "10강 …"·"11강 …" 의 공통 "1" 을
+    떼면 번호가 깨진다."""
+    n = _common_prefix_len(a, b)
+    while n > 0 and a[n - 1] not in _TITLE_BOUNDARY:
+        n -= 1
+    return n
+
+
+def _distinct_parts(titles: Sequence[str]) -> list[str]:
+    """재생목록 영상 제목에서 **이웃 영상과 똑같이 붙은** 머리·꼬리를 뗀다.
+
+    "토익 독학러 문법 정복 프로젝트 [1일차 시제]" → "1일차 시제". 대괄호 속만 고르면
+    "[해커스] 토익 1강 - 시제" 에서 채널 꼬리표 "해커스" 를 주제로 잡는다. 전체가 아니라 앞뒤
+    이웃과 비교하는 이유: 시리즈 뒤에 성격이 다른 영상이 하나만 붙어도(실측: 9편 시리즈 + '총정리'
+    1편) 전체 공통 머리가 "토익 " 으로 줄어 시리즈 머리말이 모든 주제에 남는다.
+    """
+    flat = [" ".join(_SQUARE_RE.sub(" ", t).split()) for t in titles]
+    out = []
+    for i, title in enumerate(flat):
+        near = [flat[j] for j in (i - 1, i + 1) if 0 <= j < len(flat) and flat[j] != title]
+        if not near:
+            out.append(title)
+            continue
+        rest = title[max(_shared_head(title, t) for t in near) :]
+        tail = max(_shared_head(rest[::-1], t[::-1]) for t in near)
+        part = (rest[: len(rest) - tail] if tail else rest).strip(_TITLE_BOUNDARY)
+        out.append(part or title)
+    return out
+
+
+def _plain(text: str) -> str:
+    """이모지·장식 기호를 뗀다 — 세션 제목에 "완성❕" 이 그대로 실리지 않게."""
+    kept = "".join(ch for ch in text if unicodedata.category(ch) != "So" and ch != "\ufe0f")
+    return " ".join(kept.split())
+
+
+def _chapter_pages(item: MaterialItem) -> list[float] | None:
+    """장마다 쪽수 — 목차 체크포인트가 전부 있고 단조증가하면 그 차이, 아니면 전체를 균등 분할."""
+    n = len(item.units)
+    ends = [u.end_page for u in item.units]
+    if all(e is not None for e in ends):
+        known = [e for e in ends if e is not None]
+        if known == sorted(known):
+            return [float(b - a) for a, b in zip([0, *known[:-1]], known, strict=True)]
+    if item.page_count > 0:
+        return [item.page_count / n] * n
+    return None
+
+
+def _split_long(units: Sequence[cur.Unit], *, session_minutes: int) -> tuple[cur.Unit, ...]:
+    """한 번 길이의 1.5배를 넘는 단원은 나눠 본다 — "3강 (1/2)"·"3강 (2/2)".
+
+    교재 카드 단원은 처음부터 한 번에 볼 크기로 쪼개져 있지만, 영상 한 편·책 한 장은 그렇지
+    않다(실측 재생목록: 10편 1247분, 편당 평균 125분). 안 나누면 50분 세션 10개에 영상이 한
+    편씩 들어가 세션마다 2시간이 필요하고, 남는 세션은 복습으로 채워진다 — 볼 게 남았는데 복습을
+    시키는 계획이 된다. 나눠도 전체 분량은 그대로라 시간이 모자라면 과부하 고지가 그대로 나간다.
+    """
+    out: list[cur.Unit] = []
+    for u in units:
+        parts = round(u.minutes / session_minutes) if session_minutes > 0 else 1
+        if parts < 2 or u.minutes <= session_minutes * 1.5:
+            out.append(u)
+            continue
+        each = math.ceil(u.minutes / parts)
+        out.extend(
+            cur.Unit(
+                id=f"{u.id}-{k}",
+                label=f"{u.label} ({k}/{parts})",
+                section=u.section,
+                topic=u.topic,
+                kind=u.kind,
+                minutes=each,
+            )
+            for k in range(1, parts + 1)
+        )
+    return tuple(out)
+
+
+def _video_topic(index: int, part: str) -> str:
+    no = _LECTURE_NO_RE.match(part)
+    if no and int(no.group(1)) == index:
+        part = part[no.end() :].strip(_TITLE_BOUNDARY) or part
+    return _plain(part)[:_TOPIC_MAX].rstrip()
+
+
+def _video_units(item: MaterialItem) -> tuple[cur.Unit, ...]:
+    parts = _distinct_parts([u.title for u in item.units])
+    return tuple(
+        cur.Unit(
+            id=f"V{i:03d}",
+            label=f"{i}강",
+            section="강의",
+            topic=_video_topic(i, part),
+            kind="lesson",
+            minutes=max(_MIN_UNIT_MINUTES, u.minutes or _UNKNOWN_VIDEO_MINUTES),
+        )
+        for i, (u, part) in enumerate(zip(item.units, parts, strict=True), start=1)
+    )
+
+
+def _chapter_label(index: int, title: str) -> tuple[str, str]:
+    """목차 항목 → (장 표기, 주제)."""
+    if head := _CHAPTER_HEAD_RE.match(title):
+        return head.group(1).strip(), (head.group(2) or "").strip()
+    if numbered := _NUMBERED_RE.match(title):
+        return f"{numbered.group(1)}장", numbered.group(2).strip()
+    if _TOC_TAIL_MARK in title:
+        return "나머지", "목차 밖 분량"
+    return f"{index}장", title.strip()
+
+
+def _book_units(item: MaterialItem, *, session_minutes: int) -> tuple[cur.Unit, ...]:
+    per_page = (
+        session_minutes / item.pages_per_session
+        if item.pages_per_session
+        else _DEFAULT_MINUTES_PER_PAGE
+    )
+    pages = _chapter_pages(item)
+    units = []
+    for i, u in enumerate(item.units, start=1):
+        label, topic = _chapter_label(i, u.title)
+        minutes = (
+            max(_MIN_UNIT_MINUTES, round(pages[i - 1] * per_page))
+            if pages
+            else _UNKNOWN_CHAPTER_MINUTES
+        )
+        units.append(
+            cur.Unit(
+                id=f"C{i:03d}",
+                label=label,
+                section="본문",
+                topic=_plain(topic or label)[:_TOPIC_MAX].rstrip(),
+                kind="lesson",
+                minutes=minutes,
+            )
+        )
+    return tuple(units)
+
+
+def _book_from_material(index: int, item: MaterialItem, *, session_minutes: int) -> cur.Book:
+    is_video = item.kind == "video"
+    return cur.Book(
+        id=f"material-{index}",
+        title=item.title,
+        short=_short_name(item.title),
+        publisher=item.source,
+        isbn13="",
+        page_count=item.page_count,
+        role="video" if is_video else "book",
+        exam="",
+        score_band=(0, 990),
+        structure="",
+        units=_split_long(
+            _video_units(item) if is_video else _book_units(item, session_minutes=session_minutes),
+            session_minutes=session_minutes,
+        ),
+    )
+
+
+def books_from_materials(
+    items: Sequence[MaterialItem], *, session_minutes: int = _DEFAULT_SESSION_MINUTES
+) -> list[cur.Book]:
+    """확정한 목차 있는 도서·재생목록 → 규칙 배정기가 쓰는 단원 구조.
+
+    교재 카드와 **같은 배정기**(단계 나누기·고르게 펼치기)를 탄다. LLM 분해는 세션 수에 맞추려
+    단원 경계를 제멋대로 쪼개고 합치거나(실측: Java의 정석 7·11장을 둘로, 15·16장을 한 세션으로)
+    목록에 없는 세션을 끼웠다(재생목록 16세션 중 4개가 '오답 노트 정리'·'약점 보완' 같은 세션).
+    영상은 재생 길이를, 도서는 장의 쪽수 × 쪽당 시간을 분량으로 쓴다.
+    """
+    return [
+        _book_from_material(i, item, session_minutes=session_minutes)
+        for i, item in enumerate(items)
+    ]
 
 
 def phase_count_for(*, full_weeks: int | None, cycle_weeks: int) -> int:

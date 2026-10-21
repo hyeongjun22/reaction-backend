@@ -54,7 +54,11 @@ __all__ = [
 ]
 
 UnitKind = Literal["lesson", "practice_test", "review", "appendix"]
-BookRole = Literal["vocab", "starter", "core", "all_in_one", "practice"]
+# 교재 카드의 역할 — 추천 규칙과 API(`CuratedBook.role`)가 쓰는 값.
+CardRole = Literal["vocab", "starter", "core", "all_in_one", "practice"]
+# 카드 역할 + 사용자가 확정한 자료에서 만든 책 — "book" 은 목차가 온 도서, "video" 는 YouTube
+# 재생목록(`curriculum_plan.books_from_materials`). 추천에는 카드만 나온다.
+BookRole = CardRole | Literal["book", "video"]
 
 # 단계 수 — 마일스톤 3~5개(plan_milestones 프롬프트 계약)에 맞춘다. 실전 모의고사 단계가
 # 따로 붙으면 하나 더 는다.
@@ -84,7 +88,10 @@ class Unit:
 
 @dataclass(frozen=True, slots=True)
 class Book:
-    """교재 카드 — 구조와 메타데이터만 담는다(본문·설명 문구는 담지 않는다)."""
+    """단원 구조를 가진 자료 하나 — 교재 카드, 또는 사용자가 확정한 목차 있는 도서·재생목록.
+
+    구조와 메타데이터만 담는다(본문·설명 문구는 담지 않는다).
+    """
 
     id: str
     title: str
@@ -163,6 +170,8 @@ class Session:
             return " + ".join(
                 _range_label(book, units) for book, units in _group_by_book(self.slots)
             )
+        if len(self.slots) == 2 and self.slots[0].book.id == self.slots[1].book.id:
+            return _same_book_pair_title(*self.slots)
         if self.slots:
             return " + ".join(f"{s.label} · {s.unit.topic}" for s in self.slots)
         if self.review_of:
@@ -180,7 +189,23 @@ class Session:
             return f"{first.label} 펴고 타이머를 맞춘 뒤 첫 문항만 풀기"
         if first.book.role == "vocab":
             return f"{first.label} 단어 목록을 펴고 첫 10개를 소리 내어 읽기"
+        if first.book.role == "video":
+            return f"{first.label} 재생하고 첫 5분만 따라 보기"
+        if first.book.role == "book":
+            return f"{first.label} 펴고 첫 두 쪽만 읽어 보기"
         return f"{first.label} 첫 페이지를 펴고 예제 한 문제만 풀어 보기"
+
+
+def _same_book_pair_title(first: Slot, second: Slot) -> str:
+    """같은 책 단원 둘 — 책 이름은 한 번만. 나눠 보는 한 단원의 두 조각이면 주제도 한 번만.
+
+    "기본서 01강 · 주제1 + 02강 · 주제2", "문법 8강 (1/2) + 8강 (2/2) · 명사절". 책 이름을 두 번
+    적으면 재생목록처럼 이름이 긴 자료는 세션 제목의 절반이 같은 말이다.
+    """
+    rest = second.label.removeprefix(f"{first.book.short} ")
+    if first.unit.topic == second.unit.topic:
+        return f"{first.label} + {rest} · {first.unit.topic}"
+    return f"{first.label} · {first.unit.topic} + {rest} · {second.unit.topic}"
 
 
 @dataclass(frozen=True, slots=True)

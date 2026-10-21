@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from reaction_backend.domain import curriculum as cur
@@ -257,6 +259,28 @@ def test_session_title_and_first_step_name_the_actual_units() -> None:
     first = sp.sessions[0]
     assert first.title() == "VOCA DAY 01 · 주제1 + 기본서 01강 · 주제1"
     assert first.first_step().startswith("VOCA DAY 01 단어 목록")
+
+
+def test_two_units_of_one_book_name_the_book_once() -> None:
+    lessons = cur.spread(cur.phases([CORE]), n_sessions=12, session_minutes=60)
+    halves = replace(
+        CORE,
+        units=tuple(
+            cur.Unit(
+                id=f"U8-{k}",
+                label=f"8강 ({k}/2)",
+                section="본문",
+                topic="명사절",
+                kind="lesson",
+                minutes=50,
+            )
+            for k in (1, 2)
+        ),
+    )
+    pair = cur.spread(cur.phases([halves]), n_sessions=1, session_minutes=60)
+
+    assert lessons.sessions[0].title() == "기본서 01강 · 주제1 + 02강 · 주제2"
+    assert pair.sessions[0].title() == "기본서 8강 (1/2) + 8강 (2/2) · 명사절"
 
 
 @pytest.mark.parametrize(

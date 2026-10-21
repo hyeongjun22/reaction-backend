@@ -25,6 +25,8 @@ from reaction_backend.schemas.interview import (
     IdentityContext,
     InterviewEndReason,
     InterviewOutcome,
+    MaterialItem,
+    MaterialItemUnit,
     PreferenceProfile,
     TimeRange,
 )
@@ -133,6 +135,63 @@ def _curriculum_ids(value: Mapping[str, Any] | None) -> list[str]:
         return []
     ids = [str(i["catalog_id"]) for i in items if isinstance(i, Mapping) and i.get("catalog_id")]
     return list(dict.fromkeys(ids))
+
+
+# 단원이 이보다 적은 자료는 규칙 배정으로 얻는 게 없다(챕터 2개짜리 목차 등) — 예전처럼
+# `materials_note` 텍스트로 LLM 분해에 맡긴다.
+_MIN_STRUCTURED_UNITS = 3
+
+
+def _positive_int(value: Any) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
+
+
+def _material_items(value: Mapping[str, Any] | None) -> list[MaterialItem]:
+    """`goals.materials` 확정본 중 **단원 구조가 있는** 도서·재생목록 — 규칙 배정기의 입력.
+
+    교재 카드(`catalog_id`)는 `_curriculum_ids` 몫이라 건너뛴다. 목차가 없는 도서(판본 대부분)와
+    단원이 `_MIN_STRUCTURED_UNITS` 보다 적은 자료도 건너뛴다 — 그 자료들은 예전처럼 쪽수·텍스트로
+    LLM 분해가 다룬다.
+    """
+    if not isinstance(sv.parse(value), sv.SpecAnswer):
+        return []
+    raw_items = (value or {}).get("items")
+    if not isinstance(raw_items, list):
+        return []
+    out: list[MaterialItem] = []
+    for item in raw_items:
+        if not isinstance(item, Mapping) or item.get("catalog_id"):
+            continue
+        kind = item.get("kind")
+        if kind == "video":
+            units = [
+                MaterialItemUnit(title=str(c["title"]), minutes=_positive_int(c.get("minutes")))
+                for c in item.get("curriculum") or []
+                if isinstance(c, Mapping) and c.get("title")
+            ]
+            source = str(item.get("channel_title") or "")
+        elif kind == "book":
+            units = [
+                MaterialItemUnit(title=str(c["title"]), end_page=_positive_int(c.get("end_page")))
+                for c in item.get("chapters") or []
+                if isinstance(c, Mapping) and c.get("title")
+            ]
+            source = str(item.get("author") or "")
+        else:
+            continue
+        if len(units) < _MIN_STRUCTURED_UNITS:
+            continue
+        out.append(
+            MaterialItem(
+                kind=kind,
+                title=str(item.get("title") or ""),
+                source=source,
+                page_count=_positive_int(item.get("page_count")) or 0,
+                pages_per_session=_positive_int(item.get("pages_per_session")),
+                units=units,
+            )
+        )
+    return out
 
 
 def _format_materials_spec(value: Mapping[str, Any]) -> str | None:
@@ -291,6 +350,7 @@ def _build_goals(slot_answers: Mapping[str, Mapping[str, Any] | None]) -> list[G
     approach_note = sv.text(slot_answers.get("goals.approach"))
     materials_note = _materials_note(slot_answers.get("goals.materials"))
     curriculum = _curriculum_ids(slot_answers.get("goals.materials"))
+    material_items = _material_items(slot_answers.get("goals.materials"))
 
     if not titles:
         return [
@@ -320,6 +380,7 @@ def _build_goals(slot_answers: Mapping[str, Mapping[str, Any] | None]) -> list[G
                 approach_note=approach_note if is_heaviest else None,
                 materials_note=materials_note if is_heaviest else None,
                 curriculum=curriculum if is_heaviest else [],
+                material_items=material_items if is_heaviest else [],
                 tentative_tier="focus" if is_heaviest else "maintain",
                 confidence=0.5,
             )

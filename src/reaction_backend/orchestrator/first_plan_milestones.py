@@ -24,6 +24,7 @@ from reaction_backend.orchestrator.first_plan_adapter import (
     heaviest_goal,
     heaviest_goal_or_none,
     restore_user_phrases_in_milestones,
+    session_min_for,
 )
 from reaction_backend.schemas.common import now_kst
 from reaction_backend.schemas.interview import InterviewOutcome
@@ -33,13 +34,16 @@ from reaction_backend.schemas.planning import MilestoneDraft, MilestonePlan
 def curriculum_milestones(
     outcome: InterviewOutcome, *, cycle_weeks: int, target_date: date | None = None
 ) -> list[MilestoneDraft] | None:
-    """목표에 교재 카드가 확정돼 있으면 그 책의 단원 단계를 마일스톤으로 — LLM 0회.
+    """목표에 단원 구조가 있는 자료(교재 카드·목차 있는 도서·재생목록)가 확정돼 있으면 그 단원
+    단계를 마일스톤으로 — LLM 0회.
 
-    카드가 없으면 `None` — 호출자가 `generate_milestones`(LLM)로 간다. 라우트가 이걸 먼저
+    그런 자료가 없으면 `None` — 호출자가 `generate_milestones`(LLM)로 간다. 라우트가 이걸 먼저
     부르는 이유는 `aiSource` 를 정직하게 적기 위해서다: 카드 마일스톤은 폴백이 아니지만 LLM
     산출물도 아니라 `"rule"` 이다(`generate_milestones` 의 `fell_back` 과 뜻이 다르다).
     """
-    books = curriculum_plan.books_for(heaviest_goal_or_none(outcome))
+    books = curriculum_plan.books_for(
+        heaviest_goal_or_none(outcome), session_minutes=session_min_for(outcome)
+    )
     if not books:
         return None
     return curriculum_plan.milestones(

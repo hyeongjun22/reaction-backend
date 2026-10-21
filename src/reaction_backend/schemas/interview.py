@@ -258,6 +258,29 @@ class AvailabilityProfile(CamelModel):
     fixed_block_hints: list[str] = Field(default_factory=list)  # time.fixed_blocks 자유입력 원문
 
 
+class MaterialItemUnit(CamelModel):
+    """확정 자료의 단원 하나 — 도서 목차 항목 또는 재생목록 영상 하나."""
+
+    title: str
+    minutes: int | None = None  # 영상: 실제 재생 길이(분). 도서는 None
+    end_page: int | None = None  # 도서: 이 장이 끝나는 쪽(목차 체크포인트, best-effort)
+
+
+class MaterialItem(CamelModel):
+    """`goals.materials` 에 확정된 자료 중 **단원 구조가 있는 것**(목차가 온 도서·재생목록).
+
+    있으면 계획이 LLM 대신 이 단원 순서로 짜인다(`curriculum_plan.books_from_materials`) —
+    교재 카드와 같은 규칙 배정기를 쓴다. 쪽수만 아는 도서·붙여넣기 자료는 여기 오지 않는다.
+    """
+
+    kind: Literal["book", "video"]
+    title: str
+    source: str = ""  # 도서 저자 · 영상 채널
+    page_count: int = 0  # 도서 전체 쪽수(모르면 0)
+    pages_per_session: int | None = None  # 확정 때 계산한 세션당 권장 쪽수(마감이 있을 때만)
+    units: list[MaterialItemUnit] = Field(default_factory=list)
+
+
 class GoalCandidate(CamelModel):
     """핵심 목표 후보 (goals.* 슬롯군). First Plan 의 goal_node 분해 입력."""
 
@@ -291,6 +314,9 @@ class GoalCandidate(CamelModel):
     # 있으면 마일스톤·세션이 LLM 이 아니라 그 책의 단원 순서로 만들어진다(`curriculum_plan`).
     # 카드에 없는 책(알라딘 검색·붙여넣기)은 여기 들어오지 않고 `materials_note` 로만 간다.
     curriculum: list[str] = Field(default_factory=list)
+    # goals.materials 에서 확정한 자료 중 단원 구조가 있는 것(목차가 온 도서·YouTube 재생목록).
+    # 카드처럼 규칙 배정기로 계획을 짠다 — 카드가 아닌 책·강의도 단원을 빠뜨리지 않게.
+    material_items: list[MaterialItem] = Field(default_factory=list)
     tentative_tier: Literal["focus", "maintain", "parked"] = "maintain"
     # ⚠️ **`clarity_score` 와 무관하다.** `interview_adapter` 가 목표 출처에 따라 코드로
     # 박는다 — 추론 목록이면 0.0, 사용자가 고른 heaviest 면 0.5. 예전 주석이 "해당 슬롯

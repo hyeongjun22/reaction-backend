@@ -525,7 +525,8 @@ def _cycle_milestones(state: FirstPlanState) -> list[MilestoneDraft]:
 
 
 def _curriculum_decomposition(state: FirstPlanState) -> curriculum_plan.CurriculumPlan | None:
-    """목표에 교재 카드가 확정돼 있으면 그 단원으로 이번 주기 세션을 짠다 — 아니면 None.
+    """목표에 단원 구조가 있는 자료(교재 카드·목차 있는 도서·재생목록)가 확정돼 있으면 그 단원으로
+    이번 주기 세션을 짠다 — 아니면 None.
 
     세션 수는 '이어가기' 보충(`extend_action_plan_to_horizon`)이 채우려는 개수와 **같은 식**
     이다 — LLM 경로에서 보충까지 거친 계획과 분량이 같아야 카드 유무로 계획 크기가 달라지지
@@ -539,7 +540,8 @@ def _curriculum_decomposition(state: FirstPlanState) -> curriculum_plan.Curricul
     if outcome is None:
         return None
     heaviest = first_plan_adapter.heaviest_goal_or_none(outcome)
-    books = curriculum_plan.books_for(heaviest)
+    session_minutes = first_plan_adapter.session_min_for(outcome)
+    books = curriculum_plan.books_for(heaviest, session_minutes=session_minutes)
     if heaviest is None or not books:
         return None
     target_day = date.fromisoformat(state["target_date"])
@@ -560,7 +562,7 @@ def _curriculum_decomposition(state: FirstPlanState) -> curriculum_plan.Curricul
         all_milestones=all_milestones,
         window=_cycle_milestones({**state, "milestones": list(all_milestones)}),
         n_sessions=n_sessions,
-        session_minutes=first_plan_adapter.session_min_for(outcome),
+        session_minutes=session_minutes,
     )
 
 

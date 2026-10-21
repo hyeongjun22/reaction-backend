@@ -39,7 +39,7 @@ from __future__ import annotations
 import logging
 import re
 from http import HTTPStatus
-from typing import Annotated
+from typing import Annotated, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -385,7 +385,7 @@ async def propose_study_method(
             id=r.book.id,
             title=r.book.title,
             publisher=r.book.publisher,
-            role=r.book.role,
+            role=cast(cur.CardRole, r.book.role),  # `recommend` 는 교재 카드만 돌려준다
             structure=r.book.structure,
             unit_count=len(r.book.studyable()),
             page_count=r.book.page_count,
